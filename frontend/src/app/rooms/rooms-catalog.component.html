@@ -1,0 +1,30 @@
+<section class="wide-card">
+  <div class="row between">
+    <h1>Public rooms</h1>
+    <a routerLink="/rooms/new">
+      <button type="button">Create room</button>
+    </a>
+  </div>
+
+  <input type="text" [formControl]="search" placeholder="Search rooms…" class="search" />
+
+  <div *ngIf="loading()" class="muted">Loading…</div>
+  <div *ngIf="error() as msg" class="error">{{ msg }}</div>
+
+  <ul class="rooms-list" *ngIf="!loading()">
+    <li *ngFor="let room of rooms()">
+      <div class="row between">
+        <div>
+          <a [routerLink]="['/rooms', room.id]"><strong>{{ room.name }}</strong></a>
+          <span class="muted"> · {{ room.memberCount }} member{{ room.memberCount === 1 ? '' : 's' }}</span>
+          <p class="muted" *ngIf="room.description">{{ room.description }}</p>
+        </div>
+        <div>
+          <span *ngIf="room.myRole" class="badge">{{ room.myRole }}</span>
+          <button *ngIf="!room.myRole" type="button" (click)="join(room)">Join</button>
+        </div>
+      </div>
+    </li>
+    <li *ngIf="rooms().length === 0" class="muted">No rooms match.</li>
+  </ul>
+</section>

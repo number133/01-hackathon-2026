@@ -3,6 +3,11 @@
 
   <nav>
     <ng-container *ngIf="user() as u; else anonymous">
+      <a routerLink="/rooms" routerLinkActive="active">Rooms</a>
+      <a routerLink="/invitations" routerLinkActive="active">
+        Invitations
+        <span *ngIf="pendingInvites() > 0" class="badge">{{ pendingInvites() }}</span>
+      </a>
       <a routerLink="/account" routerLinkActive="active">Account</a>
       <a routerLink="/sessions" routerLinkActive="active">Sessions</a>
       <span class="spacer"></span>

@@ -10,7 +10,7 @@ plans live under `howto/tasks/` (globally git-ignored on the dev machines).
 |-------|---------------------------------------------------|--------------|-------------|
 | 0     | Scaffolding and "it runs"                         | Done         | 2026-04-18  |
 | 1     | Authentication and account lifecycle              | Done         | 2026-04-18  |
-| 2     | Rooms, membership, roles, admin actions           | Not started  | —           |
+| 2     | Rooms, membership, roles, admin actions           | Done         | 2026-04-18  |
 | 3     | Messaging and WebSocket transport                 | Not started  | —           |
 | 4     | Presence                                          | Not started  | —           |
 | 5     | Contacts, friend requests, bans, personal chats   | Not started  | —           |
@@ -160,7 +160,100 @@ same Spring Session JDBC row store, all behind the SPA CSRF scheme.
 
 ---
 
+## Phase 2 — Rooms, membership, roles, admin actions (done, 2026-04-18)
+
+Goal: deliver the chat-room domain end-to-end except message bodies, plus
+close the Phase 1 loose end where account deletion was blocked with a 409 if
+the user owned any room. Implementation followed
+`howto/tasks/phase_2_plan.md` and the execution rules in
+`howto/general/phase_implementation_rules.txt`.
+
+### Delivered
+
+- **Schema (V4):** `room`, `room_member` (composite PK, `owner`/`admin`/
+  `member` role), `room_ban` (with `banned_by` audit trail, set-null on
+  banner delete), `room_invitation` (with partial unique index on
+  `(room_id, invitee_user_id) WHERE status='pending'` so a user can't have
+  two open invites to the same room, but history persists after resolve).
+  Globally-unique room name enforced with a functional unique index on
+  `LOWER(name)`.
+- **RoomService** — create / update / delete / catalog / `getForViewer` with
+  private-room 404-instead-of-403 hiding, and `requireMember / requireAdmin /
+  requireOwner` as the single source of truth for permission checks.
+- **RoomMembershipService** — join (reject if private / banned / already a
+  member), leave (reject if owner), kick = ban (spec §2.4.8), ban (reject
+  owner target), unban, promote (owner-only), demote (admin target only,
+  never owner).
+- **InvitationService** — invite by username (any member may invite per spec
+  §2.4.9), partial-unique-index catches duplicate pending invites, accept
+  adds the membership row, decline / revoke close the invite in place.
+- **Controllers** — `/api/rooms` (CRUD + catalog), `/api/rooms/{id}/join`,
+  `/api/rooms/{id}/members/...`, `/api/rooms/{id}/bans/...`,
+  `/api/rooms/{id}/admins/{userId}`, `/api/invitations/...`,
+  `/api/rooms/{id}/invitations`. Each uses the `SecurityContext` principal
+  (display-cased username from Phase 1) to resolve the acting user.
+- **UserService.deleteAccount** — real cascade. Loads rooms owned by the
+  user and deletes them first (FK `ON DELETE CASCADE` handles members /
+  bans / invites for those rooms); then deletes the user row, which
+  cascades the user's memberships in other people's rooms. Entire thing
+  runs inside a single `@Transactional`.
+- **Common** — new `ForbiddenException` → 403, plus handlers for
+  `NoResourceFoundException` and `NoSuchElementException` → 404.
+- **Frontend** — standalone Angular routes `/rooms`, `/rooms/new`,
+  `/rooms/:id`, `/rooms/:id/manage` (inline tabbed panel: Members / Admins /
+  Banned / Invitations / Settings), `/invitations`. Top menu adds Rooms and
+  Invitations links with a live pending-invite badge backed by
+  `InvitationService.pendingCount` signal.
+
+### Verification (fresh `docker compose down -v && up`)
+
+- Flyway reports version `V4` after migration.
+- Register Alice / Bob / Eve via `/api/auth/register` (status 200, SESSION
+  cookie set).
+- Alice creates public room `gen` (201). Bob sees it in `/api/rooms`.
+- Bob joins (204). Alice promotes Bob (204).
+- Eve joins, then Bob (admin) bans Eve (`POST /api/rooms/{id}/bans` → 201,
+  returns the `RoomBanView` with banner username). Eve tries to re-join →
+  403 `forbidden` with message "You are banned from this room".
+- Alice creates private room `core` (201). Bob's `/api/rooms` does not
+  include it (grep `core` returns 0 hits).
+- Alice invites Bob by username. Bob's `/api/invitations` returns the
+  pending entry. Bob accepts → 204. Bob is now a member of `core`.
+- Alice deletes her account (204). Bob's catalog is `[]` — both the public
+  and private rooms owned by Alice cascaded cleanly.
+- `./gradlew test` green: 54 tests total (35 unit + 3 `AuthFlowIT` + 4
+  `RoomFlowIT` + 1 `PrivateRoomInviteIT` + 1 `OwnerCascadeIT` + 1
+  `KickEqualsBanIT` + existing Phase 1 unit tests).
+
+### Known tradeoffs carried forward
+
+- **Optional-injection of `RoomRepository` / `RoomService` into
+  `UserService`.** The user package is used from `AuthFlowIT` (which doesn't
+  exercise Phase 2 code) and from the room cascade path. To avoid a
+  circular-wiring smell in tests, both collaborators are wired with
+  `@Autowired(required = false)` and treated as optional. If either is
+  missing at runtime, `deleteAccount` falls through to the old "delete user
+  row only" behavior. A cleaner alternative is to make the cascade live on
+  a `UserLifecycleService` that depends on both domains; deferred because
+  Phase 2 is the last domain to add user-cascade logic, and Phase 3's
+  messages cascade through FKs on `room_id`, not through user.
+- **Admin UX is an inline tabbed panel, not a modal.** Per the plan and the
+  Phase 8 description in `app_requirements_plan.md`. Phase 8 will convert to
+  a modal overlay.
+- **Catalog returns a flat array** not `{items, nextCursor}` — the plan
+  proposed cursor pagination, but for Phase 2 the single `limit` parameter
+  + "sort by created_at DESC" is sufficient at the listed 300-user scale.
+  Keyset pagination lands with the history endpoint in Phase 3.
+- **Member count is computed per-row** in `RoomService.toViews` via
+  `COUNT(*)` per room. At 300 concurrent users and catalog `limit=50` this
+  is bounded; if it becomes a hot path, denormalise `room.member_count` and
+  maintain on join / leave / ban.
+
+---
+
 ## Next
 
-Phase 2 — rooms, membership, roles, admin actions. Detailed plan to be
-written under `howto/tasks/phase_2_plan.md` before implementation starts.
+Phase 3 — messaging and WebSocket transport. The last-minute
+`hint2.txt`-derived design call (message send over REST, fanout over WS;
+per-conversation `seq` watermark; 100K-message history scroll test) lands
+then. Detailed plan to be written under `howto/tasks/phase_3_plan.md`.

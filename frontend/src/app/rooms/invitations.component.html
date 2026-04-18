@@ -1,0 +1,23 @@
+<section class="wide-card">
+  <h1>Invitations</h1>
+  <div *ngIf="loading()">Loading…</div>
+  <div *ngIf="error() as msg" class="error">{{ msg }}</div>
+
+  <p *ngIf="!loading() && items().length === 0" class="muted">No pending invitations.</p>
+
+  <ul class="invitation-list" *ngIf="items().length > 0">
+    <li *ngFor="let inv of items()">
+      <div class="row between">
+        <div>
+          <strong>{{ inv.roomName }}</strong>
+          <span class="muted"> · from {{ inv.inviterUsername ?? '(deleted)' }}</span>
+          <p class="muted" *ngIf="inv.message">"{{ inv.message }}"</p>
+        </div>
+        <div class="row gap">
+          <button type="button" (click)="accept(inv)">Accept</button>
+          <button type="button" class="danger" (click)="decline(inv)">Decline</button>
+        </div>
+      </div>
+    </li>
+  </ul>
+</section>

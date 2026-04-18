@@ -225,3 +225,77 @@ hr {
   border-top: 1px solid #334155;
   margin: 24px 0;
 }
+
+.row {
+  display: flex;
+  align-items: center;
+}
+
+.row.between {
+  justify-content: space-between;
+}
+
+.row.gap {
+  gap: 8px;
+}
+
+input.search {
+  width: 100%;
+  padding: 8px 10px;
+  margin: 8px 0 16px;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+.rooms-list, .member-list, .invitation-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+}
+
+.rooms-list > li, .invitation-list > li {
+  padding: 12px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.member-list > li {
+  padding: 6px 0;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tabs button {
+  background: transparent;
+  color: #cbd5e1;
+  border: 1px solid #334155;
+}
+
+.tabs button.active {
+  background: #1e3a8a;
+  color: white;
+}
+
+textarea {
+  background: #0f172a;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 1em;
+  font-family: inherit;
+}
+
+.placeholder {
+  padding: 20px;
+  border: 1px dashed #334155;
+  border-radius: 8px;
+  text-align: center;
+}

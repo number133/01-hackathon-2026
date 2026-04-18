@@ -1,0 +1,48 @@
+<section class="wide-card" *ngIf="!loading(); else loadingTpl">
+  <div *ngIf="error() as msg" class="error">{{ msg }}</div>
+
+  <ng-container *ngIf="room() as r">
+    <div class="row between">
+      <div>
+        <h1># {{ r.name }}
+          <span class="badge">{{ r.visibility }}</span>
+        </h1>
+        <p class="muted">{{ r.description || 'No description.' }}</p>
+        <p class="muted">Owner: {{ r.ownerUsername }} · {{ r.memberCount }} member{{ r.memberCount === 1 ? '' : 's' }}</p>
+      </div>
+      <div>
+        <a *ngIf="r.myRole === 'owner' || r.myRole === 'admin'"
+           [routerLink]="['/rooms', r.id, 'manage']">
+          <button type="button">Manage room</button>
+        </a>
+        <button *ngIf="!r.myRole && r.visibility === 'public'" type="button" (click)="join()">Join</button>
+        <button *ngIf="r.myRole && r.myRole !== 'owner'" type="button" (click)="leave()">Leave</button>
+      </div>
+    </div>
+
+    <hr />
+
+    <div *ngIf="r.myRole; else notMember">
+      <h2>Members</h2>
+      <ul class="member-list">
+        <li *ngFor="let m of members()">
+          {{ m.username }}
+          <span class="badge" *ngIf="m.role !== 'member'">{{ m.role }}</span>
+        </li>
+      </ul>
+
+      <hr />
+      <div class="placeholder">
+        <p class="muted">Chat messages arrive in Phase 3.</p>
+      </div>
+    </div>
+
+    <ng-template #notMember>
+      <p class="muted">Join the room to see its members and (soon) its messages.</p>
+    </ng-template>
+  </ng-container>
+</section>
+
+<ng-template #loadingTpl>
+  <p class="booting">Loading room…</p>
+</ng-template>

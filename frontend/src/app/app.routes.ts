@@ -41,5 +41,30 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () => import('./account/sessions.component').then((m) => m.SessionsComponent),
   },
+  {
+    path: 'rooms',
+    canActivate: [authGuard],
+    loadComponent: () => import('./rooms/rooms-catalog.component').then((m) => m.RoomsCatalogComponent),
+  },
+  {
+    path: 'rooms/new',
+    canActivate: [authGuard],
+    loadComponent: () => import('./rooms/create-room.component').then((m) => m.CreateRoomComponent),
+  },
+  {
+    path: 'rooms/:id',
+    canActivate: [authGuard],
+    loadComponent: () => import('./rooms/room-view.component').then((m) => m.RoomViewComponent),
+  },
+  {
+    path: 'rooms/:id/manage',
+    canActivate: [authGuard],
+    loadComponent: () => import('./rooms/manage-room.component').then((m) => m.ManageRoomComponent),
+  },
+  {
+    path: 'invitations',
+    canActivate: [authGuard],
+    loadComponent: () => import('./rooms/invitations.component').then((m) => m.InvitationsComponent),
+  },
   { path: '**', redirectTo: '' },
 ];

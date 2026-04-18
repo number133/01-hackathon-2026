@@ -1,9 +1,13 @@
 package com.hackathon.chat.user;
 
 import com.hackathon.chat.auth.RegistrationRequest;
-import com.hackathon.chat.common.AccountConflictException;
 import com.hackathon.chat.common.DuplicateResourceException;
+import com.hackathon.chat.room.Room;
+import com.hackathon.chat.room.RoomRepository;
+import com.hackathon.chat.room.RoomService;
+import java.util.List;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -15,6 +19,12 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+
+    @Autowired(required = false)
+    private RoomRepository roomRepository;
+
+    @Autowired(required = false)
+    private RoomService roomService;
 
     public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
@@ -60,17 +70,20 @@ public class UserService {
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
             throw new BadCredentialsException("password incorrect");
         }
-        // Phase 2 will cascade-delete rooms owned by the user. For now the user
-        // cannot own any room, so this check always passes.
-        if (countRoomsOwnedBy(userId) > 0) {
-            throw new AccountConflictException(
-                    "Delete or transfer rooms you own before deleting your account.");
+        // Cascade: delete rooms the user owns first (which cascades their
+        // members/bans/invites via FK ON DELETE CASCADE). Memberships in rooms
+        // owned by other users are cleared by the users-row delete via the same
+        // FK mechanism.
+        if (roomRepository != null && roomService != null) {
+            List<Room> owned = roomRepository.findAllByOwnerId(userId);
+            for (Room r : owned) {
+                roomService.deleteAsOwnerCascade(r.getId());
+            }
         }
         userRepository.delete(user);
     }
 
-    // Phase 2 will replace this with a RoomRepository call.
-    long countRoomsOwnedBy(UUID userId) {
-        return 0;
+    public long countRoomsOwnedBy(UUID userId) {
+        return roomRepository == null ? 0 : roomRepository.countByOwnerId(userId);
     }
 }
