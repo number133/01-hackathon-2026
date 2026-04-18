@@ -99,6 +99,14 @@ Run the backend tests:
 cd backend && ./gradlew test
 ```
 
+Smoke-test the packaged Docker image — once per phase, not on every
+change. Wipes the db volume, rebuilds the image, starts the stack, and
+walks every shipped phase's primary endpoints with curl:
+
+```
+scripts/docker-smoke.sh
+```
+
 Requires JDK 21 on `JAVA_HOME` and Node.js 20+ (Node 19 is unsupported by
 Angular).
 
