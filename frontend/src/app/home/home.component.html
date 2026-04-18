@@ -1,0 +1,27 @@
+<section class="home">
+  <h1>Chat</h1>
+
+  <p *ngIf="user() as u">
+    Signed in as <strong>{{ u.username }}</strong>. Room and messaging UIs arrive in later phases.
+  </p>
+  <p *ngIf="!user()">
+    Authentication is wired up. <a routerLink="/register">Create an account</a> or
+    <a routerLink="/login">sign in</a> to try it.
+  </p>
+
+  <h2>Backend health</h2>
+  <ng-container *ngIf="state() as s">
+    <p *ngIf="s.loading">Checking…</p>
+    <div *ngIf="s.error" class="error">Health check failed: {{ s.error }}</div>
+    <dl *ngIf="s.data" class="kv">
+      <dt>status</dt>
+      <dd [class.ok]="s.data.status === 'ok'" [class.bad]="s.data.status !== 'ok'">
+        {{ s.data.status }}
+      </dd>
+      <dt>db</dt>
+      <dd [class.ok]="s.data.db === 'ok'" [class.bad]="s.data.db !== 'ok'">{{ s.data.db }}</dd>
+      <dt>flywayVersion</dt>
+      <dd>{{ s.data.flywayVersion ?? '(none)' }}</dd>
+    </dl>
+  </ng-container>
+</section>

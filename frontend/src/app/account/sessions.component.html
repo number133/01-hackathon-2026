@@ -1,0 +1,33 @@
+<section class="wide-card">
+  <h1>Active sessions</h1>
+  <p class="muted">Each row is a browser currently signed in as you. Revoke anything that looks wrong.</p>
+
+  <div *ngIf="loading()">Loading…</div>
+  <div *ngIf="error() as msg" class="error">{{ msg }}</div>
+
+  <table *ngIf="!loading() && sessions().length > 0">
+    <thead>
+      <tr>
+        <th>Started</th>
+        <th>Last active</th>
+        <th>IP</th>
+        <th>Browser</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let s of sessions()" [class.current]="s.current">
+        <td>{{ s.createdAt | date: 'medium' }}</td>
+        <td>{{ s.lastAccessedAt | date: 'medium' }}</td>
+        <td>{{ s.ip || '—' }}</td>
+        <td class="ua" [title]="s.userAgent">{{ s.userAgent || '—' }}</td>
+        <td>
+          <span *ngIf="s.current" class="badge">this browser</span>
+          <button type="button" class="danger small" (click)="revoke(s)">Revoke</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p *ngIf="!loading() && sessions().length === 0" class="muted">No active sessions.</p>
+</section>

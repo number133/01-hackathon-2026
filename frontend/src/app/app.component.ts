@@ -1,38 +1,22 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, OnInit, inject } from '@angular/core';
+import { RouterOutlet } from '@angular/router';
 
-import { HealthResponse, HealthService } from './health.service';
-
-interface HealthState {
-  loading: boolean;
-  data: HealthResponse | null;
-  error: string | null;
-}
+import { AuthService } from './auth/auth.service';
+import { TopMenuComponent } from './layout/top-menu.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, RouterOutlet, TopMenuComponent],
   templateUrl: './app.component.html',
 })
 export class AppComponent implements OnInit {
-  private readonly health = inject(HealthService);
+  private readonly auth = inject(AuthService);
 
-  readonly state = signal<HealthState>({
-    loading: true,
-    data: null,
-    error: null,
-  });
+  readonly ready = this.auth.ready;
 
   ngOnInit(): void {
-    this.health.fetch().subscribe({
-      next: (data) => this.state.set({ loading: false, data, error: null }),
-      error: (err: { message?: string }) =>
-        this.state.set({
-          loading: false,
-          data: null,
-          error: err.message ?? 'Request failed',
-        }),
-    });
+    this.auth.initialize().subscribe();
   }
 }

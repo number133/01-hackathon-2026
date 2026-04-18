@@ -24,6 +24,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/chat
       SPRING_DATASOURCE_USERNAME: chat
       SPRING_DATASOURCE_PASSWORD: chat
+      SPRING_PROFILES_ACTIVE: dev
     ports:
       - "8080:8080"
     volumes:

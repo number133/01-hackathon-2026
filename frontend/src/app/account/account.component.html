@@ -1,0 +1,43 @@
+<section class="auth-card">
+  <h1>Account</h1>
+
+  <dl class="profile">
+    <dt>Username</dt>
+    <dd>{{ user()?.username }}</dd>
+
+    <dt>Email</dt>
+    <dd>{{ user()?.email }}</dd>
+  </dl>
+
+  <div class="actions">
+    <a routerLink="/account/password">Change password</a>
+    <span class="sep">·</span>
+    <a routerLink="/sessions">Active sessions</a>
+  </div>
+
+  <hr />
+
+  <h2>Danger zone</h2>
+  <p class="muted">
+    Deleting your account removes your profile and rejects future sign-ins. Rooms you own
+    must be deleted or transferred before account deletion is allowed.
+  </p>
+
+  <div *ngIf="!confirming()">
+    <button type="button" class="danger" (click)="beginDelete()">Delete account</button>
+  </div>
+
+  <form *ngIf="confirming()" [formGroup]="form" (ngSubmit)="confirmDelete()">
+    <label>
+      <span>Confirm with your password</span>
+      <input type="password" formControlName="password" autocomplete="current-password" />
+    </label>
+
+    <div *ngIf="error() as msg" class="error">{{ msg }}</div>
+
+    <button type="submit" class="danger" [disabled]="submitting() || form.invalid">
+      {{ submitting() ? 'Deleting…' : 'Yes, delete my account' }}
+    </button>
+    <button type="button" (click)="cancelDelete()">Cancel</button>
+  </form>
+</section>

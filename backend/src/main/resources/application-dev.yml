@@ -1,0 +1,4 @@
+logging:
+  level:
+    com.hackathon.chat: DEBUG
+    org.springframework.session: INFO

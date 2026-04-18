@@ -1,0 +1,18 @@
+<header class="top-menu">
+  <a routerLink="/" class="brand">Chat</a>
+
+  <nav>
+    <ng-container *ngIf="user() as u; else anonymous">
+      <a routerLink="/account" routerLinkActive="active">Account</a>
+      <a routerLink="/sessions" routerLinkActive="active">Sessions</a>
+      <span class="spacer"></span>
+      <span class="signed-in">signed in as <strong>{{ u.username }}</strong></span>
+      <button type="button" (click)="logout()">Sign out</button>
+    </ng-container>
+    <ng-template #anonymous>
+      <span class="spacer"></span>
+      <a routerLink="/login">Sign in</a>
+      <a routerLink="/register">Register</a>
+    </ng-template>
+  </nav>
+</header>

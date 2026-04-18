@@ -4,14 +4,34 @@ server:
 spring:
   application:
     name: chat-backend
+  profiles:
+    default: dev
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/chat}
     username: ${SPRING_DATASOURCE_USERNAME:chat}
     password: ${SPRING_DATASOURCE_PASSWORD:chat}
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
   flyway:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: false
+  session:
+    store-type: jdbc
+    jdbc:
+      initialize-schema: never
+      table-name: SPRING_SESSION
+
+chat:
+  session:
+    short-ttl: 24h
+    long-ttl: 30d
 
 management:
   endpoints:
