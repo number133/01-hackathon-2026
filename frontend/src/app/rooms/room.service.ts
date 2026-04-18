@@ -7,6 +7,7 @@ export type RoomRole = 'owner' | 'admin' | 'member';
 
 export interface RoomView {
   id: string;
+  conversationId: string;
   name: string;
   description: string;
   visibility: RoomVisibility;

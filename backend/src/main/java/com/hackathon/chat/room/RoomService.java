@@ -1,5 +1,6 @@
 package com.hackathon.chat.room;
 
+import com.hackathon.chat.attachment.AttachmentService;
 import com.hackathon.chat.common.DuplicateResourceException;
 import com.hackathon.chat.common.ForbiddenException;
 import com.hackathon.chat.conversation.Conversation;
@@ -13,6 +14,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -26,15 +28,18 @@ public class RoomService {
     private final RoomMemberRepository memberRepository;
     private final UserRepository userRepository;
     private final ConversationService conversationService;
+    private final AttachmentService attachmentService;
 
     public RoomService(RoomRepository roomRepository,
                        RoomMemberRepository memberRepository,
                        UserRepository userRepository,
-                       ConversationService conversationService) {
+                       ConversationService conversationService,
+                       @Lazy AttachmentService attachmentService) {
         this.roomRepository = roomRepository;
         this.memberRepository = memberRepository;
         this.userRepository = userRepository;
         this.conversationService = conversationService;
+        this.attachmentService = attachmentService;
     }
 
     public Room create(UUID ownerId, CreateRoomRequest request) {
@@ -103,6 +108,7 @@ public class RoomService {
         roomRepository.deleteById(room.getId());
         if (conversationId != null) {
             conversationService.deleteConversation(conversationId);
+            attachmentService.deleteConversationTree(conversationId);
         }
     }
 
@@ -181,6 +187,7 @@ public class RoomService {
             String myRole = viewerMembership.map(RoomMember::getRole).orElse(null);
             views.add(new RoomView(
                     r.getId(),
+                    r.getConversationId(),
                     r.getName(),
                     r.getDescription(),
                     r.getVisibility(),

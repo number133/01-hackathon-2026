@@ -37,6 +37,7 @@ class MessageServiceTest {
     private RoomService roomService;
     private ConversationService conversationService;
     private DialogService dialogService;
+    private com.hackathon.chat.attachment.AttachmentService attachmentService;
     private MessageBroadcaster broadcaster;
     private MessageService service;
 
@@ -53,9 +54,11 @@ class MessageServiceTest {
         roomService = Mockito.mock(RoomService.class);
         conversationService = Mockito.mock(ConversationService.class);
         dialogService = Mockito.mock(DialogService.class);
+        attachmentService = Mockito.mock(com.hackathon.chat.attachment.AttachmentService.class);
         broadcaster = Mockito.mock(MessageBroadcaster.class);
         service = new MessageService(messageRepo, roomRepo, userRepo,
-                roomService, conversationService, dialogService, broadcaster);
+                roomService, conversationService, dialogService, attachmentService, broadcaster);
+        when(attachmentService.refsByMessage(any())).thenReturn(java.util.Map.of());
 
         conversationId = UUID.randomUUID();
         roomId = UUID.randomUUID();
@@ -78,8 +81,8 @@ class MessageServiceTest {
         when(conversationService.assignNextSeq(conversationId)).thenReturn(1L, 2L);
         when(messageRepo.save(any(Message.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        MessageView first = service.post(userId, roomId, new SendMessageRequest("hello", null));
-        MessageView second = service.post(userId, roomId, new SendMessageRequest("hi again", null));
+        MessageView first = service.post(userId, roomId, new SendMessageRequest("hello", null, null));
+        MessageView second = service.post(userId, roomId, new SendMessageRequest("hi again", null, null));
 
         assertThat(first.seq()).isEqualTo(1L);
         assertThat(second.seq()).isEqualTo(2L);
@@ -95,7 +98,7 @@ class MessageServiceTest {
                 .thenThrow(new ForbiddenException("not member"));
 
         assertThatThrownBy(() -> service.post(userId, roomId,
-                new SendMessageRequest("hi", null)))
+                new SendMessageRequest("hi", null, null)))
                 .isInstanceOf(ForbiddenException.class);
 
         verify(messageRepo, never()).save(any());
@@ -110,7 +113,7 @@ class MessageServiceTest {
         String oversize = "\uD83D\uDE00".repeat(800);
 
         assertThatThrownBy(() -> service.post(userId, roomId,
-                new SendMessageRequest(oversize, null)))
+                new SendMessageRequest(oversize, null, null)))
                 .isInstanceOf(IllegalArgumentException.class);
 
         verify(messageRepo, never()).save(any());
@@ -126,7 +129,7 @@ class MessageServiceTest {
         when(messageRepo.findById(parentId)).thenReturn(Optional.of(parent));
 
         assertThatThrownBy(() -> service.post(userId, roomId,
-                new SendMessageRequest("reply", parentId)))
+                new SendMessageRequest("reply", parentId, null)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

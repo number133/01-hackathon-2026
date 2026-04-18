@@ -36,7 +36,8 @@ class RoomServiceTest {
         userRepo = Mockito.mock(UserRepository.class);
         conversationService = Mockito.mock(ConversationService.class);
         when(conversationService.create(anyString())).thenReturn(new Conversation(Conversation.TYPE_ROOM));
-        service = new RoomService(roomRepo, memberRepo, userRepo, conversationService);
+        service = new RoomService(roomRepo, memberRepo, userRepo, conversationService,
+                Mockito.mock(com.hackathon.chat.attachment.AttachmentService.class));
     }
 
     @Test

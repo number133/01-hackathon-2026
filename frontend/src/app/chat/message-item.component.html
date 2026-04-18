@@ -12,7 +12,13 @@
 
   <ng-container *ngIf="!message.deletedAt; else deletedTpl">
     <ng-container *ngIf="!editing(); else editTpl">
-      <p class="body">{{ message.body }}</p>
+      <p *ngIf="message.body" class="body">{{ message.body }}</p>
+      <div *ngIf="message.attachments?.length" class="attachments">
+        <app-attachment-view
+          *ngFor="let a of message.attachments"
+          [attachment]="a">
+        </app-attachment-view>
+      </div>
       <div class="actions small">
         <button type="button" class="link" (click)="emitReply()">Reply</button>
         <button *ngIf="canEdit" type="button" class="link" (click)="startEdit()">Edit</button>

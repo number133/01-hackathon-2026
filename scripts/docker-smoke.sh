@@ -296,6 +296,43 @@ DLG_FINAL="$(call GET "/api/dialogs/$DLG_ID" --jar "$ALICE_JAR")"
   || fail "dialog should unfreeze after re-friend: $DLG_FINAL"
 green "  unban alone keeps frozen; re-friend unfreezes"
 
+# ───────────────────────── phase 6: attachments ─────────────────────────
+
+step "Phase 6 — upload + link + download"
+ROOM_VIEW="$(call GET "/api/rooms/$ROOM_ID" --jar "$ALICE_JAR")"
+CONV_ID="$(json_field "$ROOM_VIEW" "['conversationId']")"
+[[ -n "$CONV_ID" ]] || fail "room view should carry conversationId: $ROOM_VIEW"
+
+TMPFILE="./smoke-upload-$$.png"
+printf 'smoke-bytes' > "$TMPFILE"
+ACSRF="$(csrf_of "$ALICE_JAR")"
+UPLOAD_CODE="$(curl -sS -b "$ALICE_JAR" -H "X-XSRF-TOKEN: $ACSRF" \
+  -F "file=@$TMPFILE;type=image/png" \
+  -F "conversationId=$CONV_ID" \
+  -F 'comment=smoke' \
+  -o /tmp/smoke.body -w '%{http_code}' \
+  "${BASE_URL}/api/attachments")"
+assert_status 201 "$UPLOAD_CODE" "POST /api/attachments"
+ATT_ID="$(json_field "$(cat /tmp/smoke.body)" "['id']")"
+rm -f "$TMPFILE"
+green "  upload ok: attachment=$ATT_ID"
+
+SEND="$(call POST "/api/rooms/$ROOM_ID/messages" --jar "$ALICE_JAR" --expect 201 \
+  --body "{\"text\":\"with attachment\",\"attachmentIds\":[\"$ATT_ID\"]}")"
+ATT_ECHO="$(json_field "$SEND" "['attachments'][0]['id']")"
+[[ "$ATT_ECHO" == "$ATT_ID" ]] || fail "MessageView should carry the attachment: $SEND"
+
+BCSRF="$(csrf_of "$BOB_JAR")"
+DL_CODE="$(curl -sS -b "$BOB_JAR" -H "X-XSRF-TOKEN: $BCSRF" \
+  -o /tmp/smoke.body -w '%{http_code}' "${BASE_URL}/api/attachments/$ATT_ID")"
+assert_status 200 "$DL_CODE" "GET /api/attachments/$ATT_ID"
+[[ "$(cat /tmp/smoke.body)" == "smoke-bytes" ]] || fail "downloaded bytes mismatch"
+green "  linked + bob downloaded bytes"
+
+call POST "/api/rooms/$ROOM_ID/messages" --jar "$ALICE_JAR" --expect 400 \
+  --body '{}' >/dev/null
+green "  empty message rejected 400"
+
 # ───────────────────────── static assets ─────────────────────────────────
 
 step "Static — SPA fallback and Angular bundle"
@@ -311,4 +348,4 @@ green "  SPA fallback serves index.html for /rooms/<id>"
 # ───────────────────────── done ──────────────────────────────────────────
 
 green ""
-green "All docker smoke checks passed (phases 0, 1, 2, 3, 3.1, 4, 5)."
+green "All docker smoke checks passed (phases 0, 1, 2, 3, 3.1, 4, 5, 6)."

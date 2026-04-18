@@ -2,13 +2,14 @@ import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 
+import { AttachmentViewComponent } from '../attachment/attachment-view.component';
 import { AuthService } from '../auth/auth.service';
 import { ChatService, MessageView } from './chat.service';
 
 @Component({
   selector: 'app-message-item',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, AttachmentViewComponent],
   templateUrl: './message-item.component.html',
 })
 export class MessageItemComponent {

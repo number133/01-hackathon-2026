@@ -76,6 +76,25 @@ public class ApiExceptionHandler {
         return body(HttpStatus.BAD_REQUEST, "bad_request", ex.getMessage());
     }
 
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<Map<String, Object>> handleUploadTooLarge(
+            org.springframework.web.multipart.MaxUploadSizeExceededException ex) {
+        return body(HttpStatus.PAYLOAD_TOO_LARGE, "payload_too_large",
+                "Upload exceeds the server limit");
+    }
+
+    @ExceptionHandler(com.hackathon.chat.attachment.AttachmentTooLargeException.class)
+    public ResponseEntity<Map<String, Object>> handleAttachmentTooLarge(
+            com.hackathon.chat.attachment.AttachmentTooLargeException ex) {
+        return body(HttpStatus.PAYLOAD_TOO_LARGE, "payload_too_large", ex.getMessage());
+    }
+
+    @ExceptionHandler(com.hackathon.chat.attachment.UnsupportedMimeTypeException.class)
+    public ResponseEntity<Map<String, Object>> handleUnsupportedMime(
+            com.hackathon.chat.attachment.UnsupportedMimeTypeException ex) {
+        return body(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "unsupported_media_type", ex.getMessage());
+    }
+
     private ResponseEntity<Map<String, Object>> body(HttpStatus status, String error, String message) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("error", error);

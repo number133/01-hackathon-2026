@@ -12,11 +12,16 @@
     (keydown)="handleKeydown($event)">
   </textarea>
 
+  <app-attachment-picker
+    [conversationId]="conversationId"
+    (idsChange)="onAttachmentsChange($event)">
+  </app-attachment-picker>
+
   <div *ngIf="error() as msg" class="error small">{{ msg }}</div>
 
   <div class="row between">
     <span class="muted small">{{ text.value.length }}/3072</span>
-    <button type="button" (click)="submit()" [disabled]="submitting() || text.invalid">
+    <button type="button" (click)="submit()" [disabled]="!canSend()">
       {{ submitting() ? 'Sending…' : 'Send' }}
     </button>
   </div>

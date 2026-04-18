@@ -1,5 +1,7 @@
 package com.hackathon.chat.message;
 
+import com.hackathon.chat.attachment.AttachmentRef;
+import com.hackathon.chat.attachment.AttachmentService;
 import com.hackathon.chat.common.AccountConflictException;
 import com.hackathon.chat.common.ForbiddenException;
 import com.hackathon.chat.conversation.Conversation;
@@ -41,6 +43,7 @@ public class MessageService {
     private final RoomService roomService;
     private final ConversationService conversationService;
     private final DialogService dialogService;
+    private final AttachmentService attachmentService;
     private final MessageBroadcaster broadcaster;
 
     public MessageService(MessageRepository messageRepository,
@@ -49,6 +52,7 @@ public class MessageService {
                           RoomService roomService,
                           ConversationService conversationService,
                           DialogService dialogService,
+                          AttachmentService attachmentService,
                           MessageBroadcaster broadcaster) {
         this.messageRepository = messageRepository;
         this.roomRepository = roomRepository;
@@ -56,6 +60,7 @@ public class MessageService {
         this.roomService = roomService;
         this.conversationService = conversationService;
         this.dialogService = dialogService;
+        this.attachmentService = attachmentService;
         this.broadcaster = broadcaster;
     }
 
@@ -63,10 +68,7 @@ public class MessageService {
         roomService.requireMember(roomId, userId);
         Room room = roomService.requireRoom(roomId);
         UUID conversationId = room.getConversationId();
-        String body = request.text();
-        if (body.getBytes(StandardCharsets.UTF_8).length > BODY_MAX_BYTES) {
-            throw new IllegalArgumentException("Message body exceeds 3072-byte cap");
-        }
+        validateBody(request);
         if (request.replyToId() != null) {
             Message parent = messageRepository.findById(request.replyToId())
                     .orElseThrow(() -> new NoSuchElementException("Reply target not found"));
@@ -76,7 +78,8 @@ public class MessageService {
         }
         long seq = conversationService.assignNextSeq(conversationId);
         Message saved = messageRepository.save(
-                new Message(conversationId, seq, userId, body, request.replyToId()));
+                new Message(conversationId, seq, userId, request.hasText() ? request.text() : "", request.replyToId()));
+        attachmentService.linkToMessage(request.attachmentIds(), conversationId, userId, saved.getId());
         MessageView view = toView(saved, room);
         broadcaster.publish(WsEventEnvelope.EVENT_CREATED, roomId, view);
         return view;
@@ -145,10 +148,7 @@ public class MessageService {
 
     public MessageView postToDialog(UUID userId, UUID conversationId, SendMessageRequest request) {
         dialogService.assertCanSend(conversationId, userId);
-        String body = request.text();
-        if (body.getBytes(StandardCharsets.UTF_8).length > BODY_MAX_BYTES) {
-            throw new IllegalArgumentException("Message body exceeds 3072-byte cap");
-        }
+        validateBody(request);
         if (request.replyToId() != null) {
             Message parent = messageRepository.findById(request.replyToId())
                     .orElseThrow(() -> new NoSuchElementException("Reply target not found"));
@@ -158,10 +158,21 @@ public class MessageService {
         }
         long seq = conversationService.assignNextSeq(conversationId);
         Message saved = messageRepository.save(
-                new Message(conversationId, seq, userId, body, request.replyToId()));
+                new Message(conversationId, seq, userId, request.hasText() ? request.text() : "", request.replyToId()));
+        attachmentService.linkToMessage(request.attachmentIds(), conversationId, userId, saved.getId());
         MessageView view = toView(saved, null);
         broadcaster.publishToDialog(WsEventEnvelope.EVENT_CREATED, conversationId, view);
         return view;
+    }
+
+    private void validateBody(SendMessageRequest request) {
+        if (!request.hasText() && !request.hasAttachments()) {
+            throw new IllegalArgumentException("Message must have text or attachments");
+        }
+        if (request.hasText()
+                && request.text().getBytes(StandardCharsets.UTF_8).length > BODY_MAX_BYTES) {
+            throw new IllegalArgumentException("Message body exceeds 3072-byte cap");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -237,6 +248,16 @@ public class MessageService {
         if (!userIds.isEmpty()) {
             userRepository.findAllById(userIds).forEach(u -> usernames.put(u.getId(), u.getUsername()));
         }
+        List<UUID> messageIds = new ArrayList<>(messages.size());
+        for (Message m : messages) {
+            if (m.getId() != null) {
+                messageIds.add(m.getId());
+            }
+        }
+        Map<UUID, List<AttachmentRef>> attachments = messageIds.isEmpty()
+                ? Map.of()
+                : attachmentService.refsByMessage(messageIds);
+
         List<MessageView> out = new ArrayList<>(messages.size());
         for (Message m : messages) {
             MessageView.ReplyRef ref = null;
@@ -252,6 +273,9 @@ public class MessageService {
                     ref = new MessageView.ReplyRef(parent.getId(), parent.getSeq(), parentAuthor, preview);
                 }
             }
+            List<AttachmentRef> refs = m.getId() == null
+                    ? List.of()
+                    : attachments.getOrDefault(m.getId(), List.of());
             out.add(new MessageView(
                     m.getId(),
                     m.getConversationId(),
@@ -261,6 +285,7 @@ public class MessageService {
                     m.getAuthorId() == null ? "(deleted)" : usernames.getOrDefault(m.getAuthorId(), "(deleted)"),
                     m.isDeleted() ? null : m.getBody(),
                     ref,
+                    refs,
                     m.getCreatedAt(),
                     m.getEditedAt(),
                     m.getDeletedAt()));

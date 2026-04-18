@@ -5,6 +5,7 @@ import java.util.UUID;
 
 public record RoomView(
         UUID id,
+        UUID conversationId,
         String name,
         String description,
         String visibility,

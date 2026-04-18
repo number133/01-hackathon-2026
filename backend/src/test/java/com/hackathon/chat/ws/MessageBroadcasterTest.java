@@ -23,6 +23,7 @@ class MessageBroadcasterTest {
         MessageView view = new MessageView(
                 UUID.randomUUID(), conversationId, roomId, 42L,
                 UUID.randomUUID(), "alice", "hi", null,
+                java.util.List.of(),
                 Instant.now(), null, null);
 
         broadcaster.publish(WsEventEnvelope.EVENT_CREATED, roomId, view);

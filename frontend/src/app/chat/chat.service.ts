@@ -10,15 +10,25 @@ export interface MessageReplyRef {
   bodyPreview: string | null;
 }
 
+export interface AttachmentRef {
+  id: string;
+  originalName: string;
+  mimeType: string;
+  sizeBytes: number;
+  comment: string | null;
+  isImage: boolean;
+}
+
 export interface MessageView {
   id: string;
   conversationId: string;
-  roomId: string;
+  roomId: string | null;
   seq: number;
   authorId: string | null;
   authorUsername: string;
   body: string | null;
   replyTo: MessageReplyRef | null;
+  attachments: AttachmentRef[];
   createdAt: string;
   editedAt: string | null;
   deletedAt: string | null;
@@ -176,9 +186,17 @@ export class ChatService {
       ) as unknown as Observable<MessageView[]>;
   }
 
-  post(roomId: string, text: string, replyToId: string | null): Observable<MessageView> {
-    return this.http
-      .post<MessageView>(`/api/rooms/${roomId}/messages`, { text, replyToId });
+  post(
+    roomId: string,
+    text: string,
+    replyToId: string | null,
+    attachmentIds: string[] = [],
+  ): Observable<MessageView> {
+    return this.http.post<MessageView>(`/api/rooms/${roomId}/messages`, {
+      text,
+      replyToId,
+      attachmentIds,
+    });
   }
 
   edit(messageId: string, text: string): Observable<MessageView> {

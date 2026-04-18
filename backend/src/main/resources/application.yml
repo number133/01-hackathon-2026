@@ -37,6 +37,22 @@ chat:
     afk-threshold: 60s
     offline-grace: 30s
     sweep-interval: 5s
+  attachment:
+    max-size: 20MB
+    max-image-size: 3MB
+    orphan-ttl: 1h
+    sweep-interval: 5m
+    storage-root: /data/uploads
+    max-per-message: 10
+    blocked-mime-prefixes:
+      - application/x-msdownload
+      - application/x-msdos-program
+      - application/x-executable
+      - text/html
+
+spring.servlet.multipart:
+  max-file-size: 21MB
+  max-request-size: 21MB
 
 management:
   endpoints:

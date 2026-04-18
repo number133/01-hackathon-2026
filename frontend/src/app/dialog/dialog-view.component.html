@@ -16,8 +16,14 @@
         <small>{{ m.createdAt | date: 'short' }}</small>
         <small *ngIf="m.editedAt" class="muted">(edited)</small>
       </header>
-      <p *ngIf="!m.deletedAt">{{ m.body }}</p>
+      <p *ngIf="!m.deletedAt && m.body">{{ m.body }}</p>
       <p *ngIf="m.deletedAt" class="muted">(deleted)</p>
+      <div *ngIf="!m.deletedAt && m.attachments?.length" class="attachments">
+        <app-attachment-view
+          *ngFor="let a of m.attachments"
+          [attachment]="a">
+        </app-attachment-view>
+      </div>
     </article>
   </div>
 
@@ -28,6 +34,10 @@
       rows="2"
       placeholder="Type a message. Enter to send, Shift+Enter for newline."
     ></textarea>
-    <button type="submit" [disabled]="text.invalid">Send</button>
+    <app-attachment-picker
+      [conversationId]="d.id"
+      (idsChange)="onAttachmentsChange($event)">
+    </app-attachment-picker>
+    <button type="submit" [disabled]="!canSend()">Send</button>
   </form>
 </section>

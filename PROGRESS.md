@@ -15,7 +15,7 @@ plans live under `howto/tasks/` (globally git-ignored on the dev machines).
 | 3.1   | Split "remove" from "ban" (fix-up of Phase 2)     | Done         | 2026-04-18  |
 | 4     | Presence                                          | Done         | 2026-04-18  |
 | 5     | Contacts, friend requests, bans, personal chats   | Done         | 2026-04-18  |
-| 6     | Attachments                                       | Not started  | —           |
+| 6     | Attachments                                       | Done         | 2026-04-18  |
 | 7     | Notifications and unread state                    | Not started  | —           |
 | 8     | Admin UI polish                                   | Not started  | —           |
 | 9     | End-to-end hardening for the demo                 | Not started  | —           |
@@ -580,9 +580,92 @@ primitives. Presence dots on contacts reuse Phase 4's
 
 ---
 
+## Phase 6 — Attachments (done, 2026-04-18)
+
+Goal: messages can carry one or more files — images rendered inline,
+other files as download cards — with local-FS storage and access
+gated on the same room-member / dialog-participant rules the
+conversation uses (spec §2.6).
+
+### Delivered
+
+- **V7 migration** — `attachment` with nullable `message_id` (for the
+  two-step upload), `conversation_id` denormalized for fast access
+  checks, partial index on orphans, `uploader_id ON DELETE SET NULL`
+  so files persist when the uploader loses access (spec §2.6.5).
+- **`AttachmentProperties`** — `chat.attachment.max-size` (20MB),
+  `max-image-size` (3MB), `orphan-ttl` (1h), `sweep-interval` (5m),
+  `storage-root` (`/data/uploads`), `max-per-message` (10),
+  `blocked-mime-prefixes`. Servlet multipart limits wired to match.
+- **`AttachmentService`** — streaming `.part → rename` writes,
+  `linkToMessage` stamps message id during send (foreign-uploader /
+  wrong-conversation / double-link are 409), scheduled
+  `sweepOrphans`, `deleteConversationTree` hook called from
+  `RoomService.deleteConversationAndRoom` (@Lazy breaks the cycle).
+- **Access check** — unified helper:
+  `attachment → conversation → room member + not banned, or dialog
+  participant`; orphans only their uploader can read. Frozen
+  dialogs still allow downloads per §2.3.5.
+- **REST** — `POST /api/attachments` multipart, `GET /{id}` streams
+  bytes with RFC-5987 filename header, `GET /{id}/metadata`,
+  `DELETE /{id}` (orphan only). `MaxUploadSizeExceededException` →
+  413 in `ApiExceptionHandler`; custom `AttachmentTooLargeException`
+  and `UnsupportedMimeTypeException` → 413 / 415.
+- **Message integration** — `SendMessageRequest.attachmentIds`,
+  `text` optional when attachments present, empty bodies 400.
+  `MessageService.post` / `postToDialog` link attachments inside
+  the same transaction as the message save. `MessageView` carries
+  `attachments: AttachmentRef[]` populated via one batched
+  `findAllByMessageIdIn` per history page. `RoomView` gained
+  `conversationId` so the composer can pass it without a second
+  round-trip.
+- **Frontend** — `AttachmentService` (multipart upload + cancel),
+  `AttachmentPickerComponent` (paperclip button + `paste`
+  listener + per-file chip with optional comment),
+  `AttachmentViewComponent` (inline image or file card). Composer
+  and dialog view both embed the picker; Send is disabled until
+  every upload is `ready`. Clipboard paste triggers the same
+  upload flow as the paperclip.
+- **Tests** — `AttachmentFlowIT` covers upload → metadata → link →
+  download by a second member, attachment-only 201 and empty 400,
+  ban → 403 on attachment read, room delete → per-conversation
+  directory vanishes. `MessageServiceTest` + `MessageBroadcasterTest`
+  + `RoomServiceTest` updated for the new `AttachmentService`
+  dep and the wider `MessageView` / `SendMessageRequest` shapes.
+- **Smoke script** — Phase 6 block: upload PNG-ish bytes, link on
+  send, download as another user, empty-message rejection.
+
+### Verification
+
+- `./gradlew test` — green including `AttachmentFlowIT` (4 cases).
+- `scripts/docker-smoke.sh` — all eight phase blocks green on a
+  clean rebuild (run before committing).
+- Hot-reload UI: paperclip → chip with size → Send → other user's
+  tab renders the inline image within ~1 s via STOMP fanout.
+
+### Known tradeoffs carried forward
+
+- **No EXIF scrub, no virus scan, no range requests.** Listed in
+  plan §12; revisit post-demo.
+- **Trust client-provided mime for the image-vs-other size bucket.**
+  Server never executes based on it; blocklist catches the obvious
+  risky prefixes (`application/x-msdownload`,
+  `application/x-msdos-program`, `application/x-executable`,
+  `text/html`).
+- **Non-resumable uploads.** A dropped connection leaves a `.part`
+  file; next upload overwrites it or the orphan sweep cleans up at
+  the 1 h TTL. No tus/TUS protocol.
+- **Per-uploader attachments only.** Re-using someone else's orphan
+  id on a send → 409. Prevents "attach a file you didn't upload."
+- **`@Lazy` on `AttachmentService` injection into `RoomService`**
+  to break the cycle with `roomService ↔ attachmentService`
+  (cleanup hook needs room service's deletion path; service needs
+  room lookup for access check). One virtual call per
+  `deleteConversationAndRoom`; negligible.
+
+---
+
 ## Next
 
-Phase 6 — attachments (images + arbitrary files, upload + download,
-size + mime validation, local FS storage, copy-paste entry). Cursor-move / keydown / focus `active` pings
-throttled to 1–2 s; server infers AFK from absence of signals (tabs may
-hibernate, so no "going inactive" message is ever trusted).
+Phase 7 — notifications and unread state (per-user-per-conversation
+`last_read_seq` marker, live unread-bump events, UI badges).

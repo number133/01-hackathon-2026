@@ -102,8 +102,17 @@ export class DialogService {
     }
   }
 
-  post(id: string, text: string, replyToId: string | null): Observable<MessageView> {
-    return this.http.post<MessageView>(`/api/dialogs/${id}/messages`, { text, replyToId });
+  post(
+    id: string,
+    text: string,
+    replyToId: string | null,
+    attachmentIds: string[] = [],
+  ): Observable<MessageView> {
+    return this.http.post<MessageView>(`/api/dialogs/${id}/messages`, {
+      text,
+      replyToId,
+      attachmentIds,
+    });
   }
 
   setFrozen(id: string, frozen: boolean): void {

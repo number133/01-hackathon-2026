@@ -1,8 +1,10 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, ViewChild, computed, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 
+import { AttachmentPickerComponent } from '../attachment/attachment-picker.component';
+import { AttachmentViewComponent } from '../attachment/attachment-view.component';
 import { AuthService } from '../auth/auth.service';
 import { ChatService } from '../chat/chat.service';
 import { PresenceDotComponent } from '../presence/presence-dot.component';
@@ -12,10 +14,18 @@ import { DialogService, DialogView } from './dialog.service';
 @Component({
   selector: 'app-dialog-view',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, PresenceDotComponent],
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    PresenceDotComponent,
+    AttachmentPickerComponent,
+    AttachmentViewComponent,
+  ],
   templateUrl: './dialog-view.component.html',
 })
 export class DialogViewComponent {
+  @ViewChild(AttachmentPickerComponent) picker?: AttachmentPickerComponent;
+
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly dialogs = inject(DialogService);
@@ -25,9 +35,10 @@ export class DialogViewComponent {
 
   readonly dialog = signal<DialogView | null>(null);
   readonly error = signal<string | null>(null);
+  readonly attachmentIds = signal<string[]>([]);
   readonly text = new FormControl<string>('', {
     nonNullable: true,
-    validators: [Validators.required, Validators.maxLength(3072)],
+    validators: [Validators.maxLength(3072)],
   });
 
   readonly messages = computed(() => {
@@ -63,13 +74,28 @@ export class DialogViewComponent {
     if (this.watchedCounterpart) this.presence.unwatch([this.watchedCounterpart]);
   }
 
+  onAttachmentsChange(ids: string[]): void {
+    this.attachmentIds.set(ids);
+  }
+
+  canSend(): boolean {
+    const d = this.dialog();
+    if (!d || d.frozen) return false;
+    const hasText = this.text.value.trim().length > 0;
+    return hasText || this.attachmentIds().length > 0;
+  }
+
   send(): void {
     const d = this.dialog();
-    if (!d || d.frozen || this.text.invalid) return;
+    if (!d || d.frozen || !this.canSend()) return;
     const body = this.text.value.trim();
-    if (!body) return;
-    this.dialogs.post(d.id, body, null).subscribe({
-      next: () => this.text.reset(''),
+    const ids = this.attachmentIds();
+    this.dialogs.post(d.id, body, null, ids).subscribe({
+      next: () => {
+        this.text.reset('');
+        this.picker?.clear();
+        this.attachmentIds.set([]);
+      },
       error: (err: unknown) => this.error.set(this.auth.errorText(err)),
     });
   }
