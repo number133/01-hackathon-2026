@@ -13,7 +13,7 @@ FROM gradle:8.10-jdk21 AS api
 WORKDIR /api
 COPY backend/ ./
 COPY --from=web /web/dist/chat-frontend/browser/ src/main/resources/static/
-RUN chmod +x gradlew && ./gradlew --no-daemon bootJar -x test
+RUN gradle --no-daemon bootJar -x test
 
 # Stage 3 — runtime.
 FROM eclipse-temurin:21-jre-alpine AS runtime

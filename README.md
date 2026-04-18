@@ -51,51 +51,56 @@ shared/     Placeholder for code shared between the two (empty in Phase 0).
 howto/      Plans and guidance notes (globally git-ignored on this machine).
 ```
 
-## Local development (outside Docker)
+## Local development (hot reload)
 
-Docker is the canonical path. Use these only when iterating quickly on one side.
+Docker is the canonical path for grading, but for day-to-day iteration run the
+backend and frontend directly on the host — Spring Boot DevTools auto-restarts
+on class changes and the Angular dev server live-reloads on file changes, so a
+code edit lands in the browser in seconds without rebuilding the Docker image.
 
-### Backend
+Layout: Postgres stays in Docker, backend runs via `gradle bootRun`, frontend
+runs via `ng serve` on port 4200 with a proxy config that forwards `/api/**`
+and `/ws` to the backend on 8080.
 
-Requires JDK 21 on `JAVA_HOME` and a running PostgreSQL matching the defaults in
-`backend/src/main/resources/application.yml` (database `chat`, user `chat`,
-password `chat`, on `localhost:5432`). The simplest local loop is to run just
-the `db` service from compose and point the backend at it:
+### One-time setup
 
 ```
+docker compose up -d db    # host-exposes 5432
+cd frontend && npm install
+```
+
+### Run (three or four terminals)
+
+```
+# 1. Postgres (already up from setup)
 docker compose up -d db
-cd backend
-./gradlew bootRun
+
+# 2. Backend
+cd backend && ./gradlew bootRun
+
+# 3. Frontend (Angular dev server + proxy to :8080)
+cd frontend && npm start
+
+# 4. (optional) Java continuous compile — triggers DevTools restart on .java edits
+cd backend && ./gradlew -t classes
 ```
+
+Open [http://localhost:4200/](http://localhost:4200/). Save a `.ts` / `.html`
+/ `.css` file — the browser reloads in under a second. Save a `.java` file —
+terminal 4 recompiles, Spring Boot DevTools sees new `.class` files and
+restarts the context in ~1–2 s, and the next request hits the new code.
+
+Terminal 4 is optional. Without it, trigger a backend restart by running
+`./gradlew classes` once after a batch of edits.
 
 Run the backend tests:
 
 ```
-cd backend
-./gradlew test
+cd backend && ./gradlew test
 ```
 
-### Frontend
-
-Requires Node.js 20+ (Node 18 works; Node 19 is unsupported by Angular and may
-emit warnings).
-
-```
-cd frontend
-npm install
-npm start
-```
-
-Dev server runs on port 4200. Proxy `/api/**` to `http://localhost:8080` if you
-point it at a locally running backend; otherwise the health widget will report a
-failure — which is the intended visible behavior for a down backend.
-
-Production build (what the Docker image runs):
-
-```
-cd frontend
-npm run build
-```
+Requires JDK 21 on `JAVA_HOME` and Node.js 20+ (Node 19 is unsupported by
+Angular).
 
 ## Implementation progress
 
