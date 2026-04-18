@@ -58,6 +58,20 @@ public class RoomMembershipService {
         memberRepository.deleteByRoomIdAndUserId(roomId, userId);
     }
 
+    public void remove(UUID roomId, UUID targetUserId, UUID actorUserId) {
+        RoomMember actor = roomService.requireAdmin(roomId, actorUserId);
+        if (actor.getUserId().equals(targetUserId)) {
+            throw new AccountConflictException("Use 'leave' to remove yourself");
+        }
+        Room room = roomService.requireRoom(roomId);
+        if (room.getOwnerId().equals(targetUserId)) {
+            throw new AccountConflictException("The room owner cannot be removed");
+        }
+        RoomMember target = memberRepository.findByRoomIdAndUserId(roomId, targetUserId)
+                .orElseThrow(() -> new NoSuchElementException("Target user is not a member"));
+        memberRepository.delete(target);
+    }
+
     public RoomBan ban(UUID roomId, UUID targetUserId, UUID actorUserId, String reason) {
         RoomMember actor = roomService.requireAdmin(roomId, actorUserId);
         if (actor.getUserId().equals(targetUserId)) {

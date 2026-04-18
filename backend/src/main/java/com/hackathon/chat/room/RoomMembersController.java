@@ -47,8 +47,8 @@ public class RoomMembersController {
     }
 
     @DeleteMapping("/members/{userId}")
-    public ResponseEntity<Void> kick(@PathVariable UUID roomId, @PathVariable UUID userId) {
-        membership.ban(roomId, userId, me().getId(), "kick");
+    public ResponseEntity<Void> remove(@PathVariable UUID roomId, @PathVariable UUID userId) {
+        membership.remove(roomId, userId, me().getId());
         return ResponseEntity.noContent().build();
     }
 

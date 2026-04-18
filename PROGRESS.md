@@ -12,6 +12,7 @@ plans live under `howto/tasks/` (globally git-ignored on the dev machines).
 | 1     | Authentication and account lifecycle              | Done         | 2026-04-18  |
 | 2     | Rooms, membership, roles, admin actions           | Done         | 2026-04-18  |
 | 3     | Messaging and WebSocket transport                 | Done         | 2026-04-18  |
+| 3.1   | Split "remove" from "ban" (fix-up of Phase 2)     | Done         | 2026-04-18  |
 | 4     | Presence                                          | Not started  | —           |
 | 5     | Contacts, friend requests, bans, personal chats   | Not started  | —           |
 | 6     | Attachments                                       | Not started  | —           |
@@ -339,6 +340,51 @@ member, edit / delete / reply, keyset-paginated history. Followed
   (which then cascades messages + the room itself). The opposite
   direction would be equally correct; this direction keeps the
   `message.conversation_id` FK the simplest ON DELETE CASCADE.
+
+---
+
+## Phase 3.1 — Split "remove" from "ban" (done, 2026-04-18)
+
+Goal: reverse the Phase 2 decision that collapsed "kick" into "ban". Per
+`hint3.txt`, a removed user can rejoin (public rooms) or accept a fresh
+invite (private rooms); a banned user cannot rejoin until unbanned.
+
+### Delivered
+
+- **`RoomMembershipService.remove(roomId, targetId, actorId)`** — new service
+  method. Deletes the `room_member` row only; no `room_ban` insert. Admin
+  actor, non-owner target, must be a current member.
+- **`DELETE /api/rooms/{id}/members/{userId}` semantics flipped.** Still 204,
+  same path, same auth — but no longer inserts a ban row. The controller
+  handler was renamed from `kick` to `remove`.
+- **Frontend `manage-room`** — two distinct buttons per member row,
+  "Remove" and "Ban", each with its own `confirm()` copy stating exactly
+  what the target can do next (rejoin vs cannot rejoin until unbanned).
+  `RoomService.kick()` renamed to `remove()`.
+- **Test swap** — `KickEqualsBanIT` deleted (it encoded the reversed
+  invariant); `RemoveVsBanIT` added — walks remove → rejoin succeeds;
+  ban → rejoin 403; unban → rejoin succeeds; ban list reflects only the
+  ban-path action.
+- **Unit tests** — `RoomMembershipServiceTest` gains `remove`-path cases:
+  deletes member row without a ban insert, rejects owner target, rejects
+  non-admin actor, rejects non-member target.
+
+### Verification
+
+- `./gradlew test --tests '*RoomMembershipServiceTest' --tests '*RemoveVsBanIT'`
+  green.
+- Phase 2's `Known tradeoffs carried forward` note ("kick = ban per spec
+  §2.4.8") is superseded by this phase; the Phase 2 entry itself is left
+  unchanged as a historical record of what shipped at the time.
+
+### Known tradeoffs carried forward
+
+- **No remove audit trail.** The split means a removed user leaves no
+  trace in `room_ban` or anywhere else. If a per-room "members who left /
+  were removed" log is ever needed (for moderation history), it is a new
+  table, not a repurposing of `room_ban`. Out of scope here.
+- **WebSocket fanout of member changes** still missing — already tracked as
+  a Phase 3 carried gap; unchanged by this phase.
 
 ---
 

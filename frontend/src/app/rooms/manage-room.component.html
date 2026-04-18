@@ -22,8 +22,8 @@
           <td>
             <button *ngIf="m.role === 'member' && r.myRole === 'owner'" type="button" class="small" (click)="promote(m.userId)">Promote</button>
             <button *ngIf="m.role === 'admin' && (r.myRole === 'owner' || r.myRole === 'admin')" type="button" class="small" (click)="demote(m.userId)">Demote</button>
-            <button *ngIf="m.role !== 'owner'" type="button" class="small danger" (click)="kick(m.userId)">Kick</button>
-            <button *ngIf="m.role !== 'owner'" type="button" class="small danger" (click)="ban(m.userId)">Ban</button>
+            <button *ngIf="m.role !== 'owner'" type="button" class="small" (click)="remove(m.userId, m.username)">Remove</button>
+            <button *ngIf="m.role !== 'owner'" type="button" class="small danger" (click)="ban(m.userId, m.username)">Ban</button>
           </td>
         </tr>
       </tbody>

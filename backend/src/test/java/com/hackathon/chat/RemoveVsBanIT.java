@@ -24,7 +24,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
-class KickEqualsBanIT {
+class RemoveVsBanIT {
 
     @Container
     @ServiceConnection
@@ -37,26 +37,42 @@ class KickEqualsBanIT {
     private ObjectMapper json;
 
     @Test
-    void kickRecordsBanUnbanAllowsRejoin() throws Exception {
-        Cookie admin = register("kick-a@example.com", "kicka", "supersecret");
-        Cookie victim = register("kick-v@example.com", "kickv", "supersecret");
+    void removeLetsTargetRejoinAndBanDoesNot() throws Exception {
+        Cookie admin = register("rm-a@example.com", "rma", "supersecret");
+        Cookie victim = register("rm-v@example.com", "rmv", "supersecret");
 
-        String roomId = createRoom(admin, "kick-room", "public");
+        String roomId = createRoom(admin, "rm-room", "public");
         mvc.perform(post("/api/rooms/" + roomId + "/join").cookie(victim).with(csrf()))
                 .andExpect(status().isNoContent());
         String victimId = fetchMyId(victim);
 
-        // Kick.
+        // Remove: drops membership only.
         mvc.perform(delete("/api/rooms/" + roomId + "/members/" + victimId)
                         .cookie(admin).with(csrf()))
                 .andExpect(status().isNoContent());
 
-        // Ban list shows the victim.
+        // Ban list is still empty.
         mvc.perform(get("/api/rooms/" + roomId + "/bans").cookie(admin))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].username").value("kickv"));
+                .andExpect(jsonPath("$.length()").value(0));
 
-        // Victim re-join → 403.
+        // Victim can rejoin immediately.
+        mvc.perform(post("/api/rooms/" + roomId + "/join").cookie(victim).with(csrf()))
+                .andExpect(status().isNoContent());
+
+        // Now ban the same user.
+        mvc.perform(post("/api/rooms/" + roomId + "/bans")
+                        .cookie(admin).with(csrf())
+                        .contentType("application/json")
+                        .content("{\"userId\":\"" + victimId + "\",\"reason\":\"spam\"}"))
+                .andExpect(status().isCreated());
+
+        // Ban list reflects it.
+        mvc.perform(get("/api/rooms/" + roomId + "/bans").cookie(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].username").value("rmv"));
+
+        // Victim's rejoin → 403.
         mvc.perform(post("/api/rooms/" + roomId + "/join").cookie(victim).with(csrf()))
                 .andExpect(status().isForbidden());
 
@@ -65,7 +81,7 @@ class KickEqualsBanIT {
                         .cookie(admin).with(csrf()))
                 .andExpect(status().isNoContent());
 
-        // Victim re-join now OK.
+        // Victim rejoins.
         mvc.perform(post("/api/rooms/" + roomId + "/join").cookie(victim).with(csrf()))
                 .andExpect(status().isNoContent());
     }

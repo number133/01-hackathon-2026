@@ -82,7 +82,7 @@ export class RoomService {
     return this.http.get<RoomMemberView[]>(`/api/rooms/${id}/members`);
   }
 
-  kick(roomId: string, userId: string): Observable<void> {
+  remove(roomId: string, userId: string): Observable<void> {
     return this.http.delete<void>(`/api/rooms/${roomId}/members/${userId}`);
   }
 

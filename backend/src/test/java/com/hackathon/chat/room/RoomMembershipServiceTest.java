@@ -99,6 +99,67 @@ class RoomMembershipServiceTest {
     }
 
     @Test
+    void removeDeletesMemberRowAndNoBanInserted() {
+        UUID roomId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        Room room = new Room("r", "", "public", UUID.randomUUID());
+        RoomMember adminActor = new RoomMember(roomId, actorId, RoomMember.ROLE_ADMIN);
+        RoomMember targetMember = new RoomMember(roomId, targetId, RoomMember.ROLE_MEMBER);
+        when(roomService.requireAdmin(roomId, actorId)).thenReturn(adminActor);
+        when(roomService.requireRoom(roomId)).thenReturn(room);
+        when(memberRepo.findByRoomIdAndUserId(roomId, targetId)).thenReturn(Optional.of(targetMember));
+
+        service.remove(roomId, targetId, actorId);
+
+        verify(memberRepo).delete(targetMember);
+        verify(banRepo, never()).save(any(RoomBan.class));
+    }
+
+    @Test
+    void removeRejectsOwnerTarget() {
+        UUID roomId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        Room room = new Room("r", "", "public", ownerId);
+        when(roomService.requireAdmin(roomId, actorId))
+                .thenReturn(new RoomMember(roomId, actorId, RoomMember.ROLE_ADMIN));
+        when(roomService.requireRoom(roomId)).thenReturn(room);
+
+        assertThatThrownBy(() -> service.remove(roomId, ownerId, actorId))
+                .isInstanceOf(AccountConflictException.class);
+
+        verify(memberRepo, never()).delete(any(RoomMember.class));
+    }
+
+    @Test
+    void removeRejectsNonAdminActor() {
+        UUID roomId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        when(roomService.requireAdmin(roomId, actorId))
+                .thenThrow(new ForbiddenException("nope"));
+
+        assertThatThrownBy(() -> service.remove(roomId, targetId, actorId))
+                .isInstanceOf(ForbiddenException.class);
+    }
+
+    @Test
+    void removeRejectsNonMemberTarget() {
+        UUID roomId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        Room room = new Room("r", "", "public", UUID.randomUUID());
+        when(roomService.requireAdmin(roomId, actorId))
+                .thenReturn(new RoomMember(roomId, actorId, RoomMember.ROLE_ADMIN));
+        when(roomService.requireRoom(roomId)).thenReturn(room);
+        when(memberRepo.findByRoomIdAndUserId(roomId, targetId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.remove(roomId, targetId, actorId))
+                .isInstanceOf(NoSuchElementException.class);
+    }
+
+    @Test
     void banRejectsOwnerTarget() {
         UUID roomId = UUID.randomUUID();
         UUID ownerId = UUID.randomUUID();

@@ -123,18 +123,24 @@ export class ManageRoomComponent implements OnInit {
     });
   }
 
-  kick(userId: string): void {
+  remove(userId: string, username: string): void {
     const id = this.roomId();
     if (!id) return;
-    this.rooms.kick(id, userId).subscribe({
+    if (!confirm(`Remove ${username} from this room? They can rejoin (public rooms) or accept a fresh invite (private rooms).`)) {
+      return;
+    }
+    this.rooms.remove(id, userId).subscribe({
       next: () => this.loadMembers(id),
       error: (err: unknown) => this.error.set(this.auth.errorText(err)),
     });
   }
 
-  ban(userId: string): void {
+  ban(userId: string, username: string): void {
     const id = this.roomId();
     if (!id) return;
+    if (!confirm(`Ban ${username}? They cannot rejoin until an admin unbans them.`)) {
+      return;
+    }
     this.rooms.ban(id, userId, null).subscribe({
       next: () => {
         this.loadMembers(id);
