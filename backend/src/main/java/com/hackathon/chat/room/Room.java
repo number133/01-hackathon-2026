@@ -35,6 +35,9 @@ public class Room {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(name = "conversation_id")
+    private UUID conversationId;
+
     protected Room() {
     }
 
@@ -84,5 +87,13 @@ public class Room {
 
     public boolean isPublic() {
         return VISIBILITY_PUBLIC.equals(visibility);
+    }
+
+    public UUID getConversationId() {
+        return conversationId;
+    }
+
+    public void setConversationId(UUID conversationId) {
+        this.conversationId = conversationId;
     }
 }

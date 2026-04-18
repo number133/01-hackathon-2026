@@ -34,6 +34,7 @@ public class SecurityConfig {
                                 "/api/dev/**")
                         .permitAll()
                         .requestMatchers("/api/**").authenticated()
+                        .requestMatchers("/ws", "/ws/**").authenticated()
                         .anyRequest().permitAll())
                 .exceptionHandling(h -> h.authenticationEntryPoint((req, res, e) -> {
                     res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);

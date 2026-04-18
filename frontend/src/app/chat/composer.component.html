@@ -1,0 +1,23 @@
+<section class="composer">
+  <div *ngIf="replyingTo as r" class="reply-chip between">
+    <span class="muted small">Replying to {{ r.authorUsername }}: {{ r.body ?? '(deleted)' }}</span>
+    <button type="button" class="link small" (click)="clearReply.emit()">×</button>
+  </div>
+
+  <textarea
+    [formControl]="text"
+    rows="2"
+    maxlength="3072"
+    placeholder="Type a message. Enter to send, Shift+Enter for newline."
+    (keydown)="handleKeydown($event)">
+  </textarea>
+
+  <div *ngIf="error() as msg" class="error small">{{ msg }}</div>
+
+  <div class="row between">
+    <span class="muted small">{{ text.value.length }}/3072</span>
+    <button type="button" (click)="submit()" [disabled]="submitting() || text.invalid">
+      {{ submitting() ? 'Sending…' : 'Send' }}
+    </button>
+  </div>
+</section>

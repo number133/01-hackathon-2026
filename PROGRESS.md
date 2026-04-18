@@ -11,7 +11,7 @@ plans live under `howto/tasks/` (globally git-ignored on the dev machines).
 | 0     | Scaffolding and "it runs"                         | Done         | 2026-04-18  |
 | 1     | Authentication and account lifecycle              | Done         | 2026-04-18  |
 | 2     | Rooms, membership, roles, admin actions           | Done         | 2026-04-18  |
-| 3     | Messaging and WebSocket transport                 | Not started  | —           |
+| 3     | Messaging and WebSocket transport                 | Done         | 2026-04-18  |
 | 4     | Presence                                          | Not started  | —           |
 | 5     | Contacts, friend requests, bans, personal chats   | Not started  | —           |
 | 6     | Attachments                                       | Not started  | —           |
@@ -251,9 +251,99 @@ the user owned any room. Implementation followed
 
 ---
 
+## Phase 3 — Messaging and WebSocket transport (done, 2026-04-18)
+
+Goal: turn Phase 2's room shells into actual chat — text messages over REST,
+per-conversation monotonic `seq`, STOMP-over-WebSocket fanout for every
+member, edit / delete / reply, keyset-paginated history. Followed
+`howto/tasks/phase_3_plan.md` and `howto/general/phase_implementation_rules.txt`.
+
+### Delivered
+
+- **Schema (V5):** `conversation(id, type, last_seq, created_at)` with a
+  room-type per chat room, `room.conversation_id UNIQUE` (backfilled via
+  CTE for any rooms predating V5), `message(id, conversation_id, seq,
+  author_id, body, reply_to_id, created_at, edited_at, deleted_at)` with
+  a `CHECK (octet_length(body) <= 3072)` and the load-bearing index
+  `idx_message_conversation_seq_desc`.
+- **Atomic `seq` assignment via `UPDATE … RETURNING` through
+  `JdbcTemplate`.** Spring Data `@Modifying` queries can only return
+  `void`/`int` — using JdbcTemplate instead keeps the single-statement
+  row-level lock that serialises concurrent posters to one conversation.
+- **MessageService** — post / edit / delete / history with the invariants
+  from the plan: member gate, author gate for edit, author-or-admin gate
+  for delete, idempotent delete (no re-broadcast), reply target must be
+  in the same conversation, 3072-byte UTF-8 cap enforced at both API and
+  DB (multi-byte emojis trip it correctly). Keyset pagination via
+  `beforeSeq` + `limit` (default 50, capped 100).
+- **`MessageBroadcaster`** wraps `SimpMessagingTemplate` and registers a
+  `TransactionSynchronization.afterCommit` callback so a rolled-back
+  transaction never leaks a phantom event to subscribers.
+- **WebSocket** — `/ws` endpoint, `/topic/rooms/{id}` as the single push
+  channel. `WsChannelInterceptor` gates `CONNECT` on a valid session and
+  `SUBSCRIBE` on current membership *plus* a ban check (the ban trumps a
+  stale `room_member` row). All `SEND` frames to topics are rejected.
+- **Cascade.** Deleting a room now deletes the conversation, which
+  cascades message rows via `message.conversation_id` FK. Deleting a
+  user cascades owned rooms → conversations → messages. Messages a user
+  posted elsewhere keep the row with `author_id = NULL`; the API renders
+  null-author as `(deleted)`.
+- **Frontend** — new `chat/` feature. `ChatService` owns one STOMP
+  connection per browser tab, ref-counted per-room subscriptions, a
+  per-conversation `RoomState` signal with gap detection (seq >
+  expected+1 triggers a full history refetch). `MessageListComponent`
+  does bottom-stick auto-scroll + infinite scroll upward;
+  `ComposerComponent` does Enter-to-send + Shift+Enter newline +
+  reply-preview chip; `MessageItemComponent` does inline edit / delete
+  and emits reply events. Wired into `RoomViewComponent`, replacing the
+  Phase-2 placeholder.
+- **Dependencies.** Backend: `spring-boot-starter-websocket`. Frontend:
+  `@stomp/stompjs@^7`, `@ctrl/ngx-emoji-mart@^9` (picker UI polish lands
+  in Phase 6 along with attachments).
+
+### Verification (fresh `docker compose down -v && up`)
+
+- Flyway reports version `V5`.
+- Register Alice → create public room `msgtest` → post three messages
+  → seq values come back 1, 2, 3. History returns newest-first.
+- `PATCH /api/messages/{id}` on seq 2 → 200 with `editedAt` set.
+- `DELETE /api/messages/{id}` on seq 3 → 204. Subsequent history shows
+  seq 3 with `body: null`, `deletedAt` populated, position in the list
+  preserved (no hole in the seq sequence).
+- Non-member `GET /api/rooms/{id}/messages` → 403.
+- Oversized body (`"a".repeat(4000)`) → 400.
+- `./gradlew test` green: 77 pass + 1 skipped (`LargeHistoryScrollIT`
+  gated by `RUN_LARGE_HISTORY_IT=true`).
+
+### Known tradeoffs carried forward
+
+- **`@Modifying` return-type workaround.** Spring Data JPA won't let a
+  `@Modifying` query return `Long`, so the `UPDATE conversation SET …
+  RETURNING last_seq` goes through `JdbcTemplate` rather than the
+  repository. Trivial, worth a code-review note so nobody later "cleans
+  this up" back into the repo.
+- **`LargeHistoryScrollIT` gated on `RUN_LARGE_HISTORY_IT`.** Seeding
+  100,000 rows takes ~10–15 s and isn't wanted on every run. Enable in
+  CI or locally (`RUN_LARGE_HISTORY_IT=true ./gradlew test`) when
+  validating the `idx_message_conversation_seq_desc` index.
+- **No `WebSocketFanoutIT` yet.** The message-send path + topic
+  publishing is covered by unit tests (`MessageServiceTest` +
+  `MessageBroadcasterTest`) and by manual demo. An end-to-end STOMP
+  subscribe → post → receive test with `StandardWebSocketClient` lands
+  alongside Phase 4's presence fanout, which needs the same harness.
+- **Emoji picker library pulled in but UI polish deferred.** The
+  composer relies on OS-level emoji entry for now; the picker overlay
+  ships in Phase 6 when attachment UI gets the same treatment.
+- **`room.conversation_id` FK direction.** Conversation→room cascade,
+  which means the room-deletion flow has to delete the conversation row
+  (which then cascades messages + the room itself). The opposite
+  direction would be equally correct; this direction keeps the
+  `message.conversation_id` FK the simplest ON DELETE CASCADE.
+
+---
+
 ## Next
 
-Phase 3 — messaging and WebSocket transport. The last-minute
-`hint2.txt`-derived design call (message send over REST, fanout over WS;
-per-conversation `seq` watermark; 100K-message history scroll test) lands
-then. Detailed plan to be written under `howto/tasks/phase_3_plan.md`.
+Phase 4 — presence. Cursor-move / keydown / focus `active` pings
+throttled to 1–2 s; server infers AFK from absence of signals (tabs may
+hibernate, so no "going inactive" message is ever trusted).

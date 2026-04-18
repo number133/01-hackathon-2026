@@ -2,6 +2,8 @@ package com.hackathon.chat.room;
 
 import com.hackathon.chat.common.DuplicateResourceException;
 import com.hackathon.chat.common.ForbiddenException;
+import com.hackathon.chat.conversation.Conversation;
+import com.hackathon.chat.conversation.ConversationService;
 import com.hackathon.chat.user.User;
 import com.hackathon.chat.user.UserRepository;
 import java.util.ArrayList;
@@ -23,13 +25,16 @@ public class RoomService {
     private final RoomRepository roomRepository;
     private final RoomMemberRepository memberRepository;
     private final UserRepository userRepository;
+    private final ConversationService conversationService;
 
     public RoomService(RoomRepository roomRepository,
                        RoomMemberRepository memberRepository,
-                       UserRepository userRepository) {
+                       UserRepository userRepository,
+                       ConversationService conversationService) {
         this.roomRepository = roomRepository;
         this.memberRepository = memberRepository;
         this.userRepository = userRepository;
+        this.conversationService = conversationService;
     }
 
     public Room create(UUID ownerId, CreateRoomRequest request) {
@@ -38,6 +43,8 @@ public class RoomService {
                 request.description() == null ? "" : request.description().trim(),
                 request.visibility(),
                 ownerId);
+        Conversation conversation = conversationService.create(Conversation.TYPE_ROOM);
+        room.setConversationId(conversation.getId());
         try {
             Room saved = roomRepository.saveAndFlush(room);
             memberRepository.save(new RoomMember(saved.getId(), ownerId, RoomMember.ROLE_OWNER));
@@ -66,8 +73,8 @@ public class RoomService {
     }
 
     public void delete(UUID roomId, UUID actorId) {
-        requireOwner(roomId, actorId);
-        roomRepository.deleteById(roomId);
+        OwnerContext ctx = requireOwner(roomId, actorId);
+        deleteConversationAndRoom(ctx.room());
     }
 
     /**
@@ -76,7 +83,27 @@ public class RoomService {
      * the user is the owner.
      */
     public void deleteAsOwnerCascade(UUID roomId) {
-        roomRepository.deleteById(roomId);
+        Room room = roomRepository.findById(roomId).orElse(null);
+        if (room == null) {
+            return;
+        }
+        deleteConversationAndRoom(room);
+    }
+
+    /**
+     * Deletes the conversation which cascades to the room (via the FK on
+     * room.conversation_id) and to every message in that conversation. Order
+     * matters — deleting the room first would leave the conversation and its
+     * messages orphaned.
+     */
+    private void deleteConversationAndRoom(Room room) {
+        UUID conversationId = room.getConversationId();
+        // Delete the room row explicitly in case an older row predates the
+        // V5 backfill and has no conversation_id.
+        roomRepository.deleteById(room.getId());
+        if (conversationId != null) {
+            conversationService.deleteConversation(conversationId);
+        }
     }
 
     public List<Room> findOwnedBy(UUID ownerId) {

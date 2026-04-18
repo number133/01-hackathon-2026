@@ -10,6 +10,8 @@ import static org.mockito.Mockito.when;
 
 import com.hackathon.chat.common.DuplicateResourceException;
 import com.hackathon.chat.common.ForbiddenException;
+import com.hackathon.chat.conversation.Conversation;
+import com.hackathon.chat.conversation.ConversationService;
 import com.hackathon.chat.user.UserRepository;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -24,6 +26,7 @@ class RoomServiceTest {
     private RoomRepository roomRepo;
     private RoomMemberRepository memberRepo;
     private UserRepository userRepo;
+    private ConversationService conversationService;
     private RoomService service;
 
     @BeforeEach
@@ -31,7 +34,9 @@ class RoomServiceTest {
         roomRepo = Mockito.mock(RoomRepository.class);
         memberRepo = Mockito.mock(RoomMemberRepository.class);
         userRepo = Mockito.mock(UserRepository.class);
-        service = new RoomService(roomRepo, memberRepo, userRepo);
+        conversationService = Mockito.mock(ConversationService.class);
+        when(conversationService.create(anyString())).thenReturn(new Conversation(Conversation.TYPE_ROOM));
+        service = new RoomService(roomRepo, memberRepo, userRepo, conversationService);
     }
 
     @Test

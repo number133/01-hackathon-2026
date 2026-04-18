@@ -1,0 +1,15 @@
+<div class="message-scroller" #scroller (scroll)="onScroll()">
+  <div *ngIf="loading()" class="muted small center">Loading…</div>
+
+  <app-message-item
+    *ngFor="let m of messages()"
+    [message]="m"
+    [canEdit]="canEdit(m)"
+    [canDelete]="canDelete(m)"
+    (reply)="onReply($event)">
+  </app-message-item>
+
+  <p *ngIf="messages().length === 0 && !loading()" class="muted small center">
+    No messages yet. Say hi!
+  </p>
+</div>

@@ -22,19 +22,29 @@
 
     <hr />
 
-    <div *ngIf="r.myRole; else notMember">
-      <h2>Members</h2>
-      <ul class="member-list">
-        <li *ngFor="let m of members()">
-          {{ m.username }}
-          <span class="badge" *ngIf="m.role !== 'member'">{{ m.role }}</span>
-        </li>
-      </ul>
+    <div *ngIf="r.myRole; else notMember" class="chat-pane">
+      <details>
+        <summary>Members ({{ members().length }})</summary>
+        <ul class="member-list">
+          <li *ngFor="let m of members()">
+            {{ m.username }}
+            <span class="badge" *ngIf="m.role !== 'member'">{{ m.role }}</span>
+          </li>
+        </ul>
+      </details>
 
-      <hr />
-      <div class="placeholder">
-        <p class="muted">Chat messages arrive in Phase 3.</p>
-      </div>
+      <app-message-list
+        #list
+        [roomId]="r.id"
+        [myUserId]="myUserId()"
+        [myRole]="r.myRole">
+      </app-message-list>
+
+      <app-composer
+        [roomId]="r.id"
+        [replyingTo]="list.replyingTo()"
+        (clearReply)="list.clearReply()">
+      </app-composer>
     </div>
 
     <ng-template #notMember>

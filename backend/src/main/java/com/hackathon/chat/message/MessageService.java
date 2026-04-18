@@ -1,0 +1,215 @@
+package com.hackathon.chat.message;
+
+import com.hackathon.chat.common.AccountConflictException;
+import com.hackathon.chat.common.ForbiddenException;
+import com.hackathon.chat.conversation.Conversation;
+import com.hackathon.chat.conversation.ConversationService;
+import com.hackathon.chat.room.Room;
+import com.hackathon.chat.room.RoomRepository;
+import com.hackathon.chat.room.RoomService;
+import com.hackathon.chat.user.User;
+import com.hackathon.chat.user.UserRepository;
+import com.hackathon.chat.ws.MessageBroadcaster;
+import com.hackathon.chat.ws.WsEventEnvelope;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.UUID;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@Transactional
+public class MessageService {
+
+    public static final int BODY_MAX_BYTES = 3072;
+    private static final int DEFAULT_LIMIT = 50;
+    private static final int MAX_LIMIT = 100;
+    private static final int PREVIEW_LENGTH = 120;
+
+    private final MessageRepository messageRepository;
+    private final RoomRepository roomRepository;
+    private final UserRepository userRepository;
+    private final RoomService roomService;
+    private final ConversationService conversationService;
+    private final MessageBroadcaster broadcaster;
+
+    public MessageService(MessageRepository messageRepository,
+                          RoomRepository roomRepository,
+                          UserRepository userRepository,
+                          RoomService roomService,
+                          ConversationService conversationService,
+                          MessageBroadcaster broadcaster) {
+        this.messageRepository = messageRepository;
+        this.roomRepository = roomRepository;
+        this.userRepository = userRepository;
+        this.roomService = roomService;
+        this.conversationService = conversationService;
+        this.broadcaster = broadcaster;
+    }
+
+    public MessageView post(UUID userId, UUID roomId, SendMessageRequest request) {
+        roomService.requireMember(roomId, userId);
+        Room room = roomService.requireRoom(roomId);
+        UUID conversationId = room.getConversationId();
+        String body = request.text();
+        if (body.getBytes(StandardCharsets.UTF_8).length > BODY_MAX_BYTES) {
+            throw new IllegalArgumentException("Message body exceeds 3072-byte cap");
+        }
+        if (request.replyToId() != null) {
+            Message parent = messageRepository.findById(request.replyToId())
+                    .orElseThrow(() -> new NoSuchElementException("Reply target not found"));
+            if (!Objects.equals(parent.getConversationId(), conversationId)) {
+                throw new IllegalArgumentException("Reply target is in a different conversation");
+            }
+        }
+        long seq = conversationService.assignNextSeq(conversationId);
+        Message saved = messageRepository.save(
+                new Message(conversationId, seq, userId, body, request.replyToId()));
+        MessageView view = toView(saved, room);
+        broadcaster.publish(WsEventEnvelope.EVENT_CREATED, roomId, view);
+        return view;
+    }
+
+    public MessageView edit(UUID userId, UUID messageId, EditMessageRequest request) {
+        Message message = requireMessage(messageId);
+        if (!userId.equals(message.getAuthorId())) {
+            throw new ForbiddenException("Only the author can edit this message");
+        }
+        if (message.isDeleted()) {
+            throw new AccountConflictException("Cannot edit a deleted message");
+        }
+        if (request.text().getBytes(StandardCharsets.UTF_8).length > BODY_MAX_BYTES) {
+            throw new IllegalArgumentException("Message body exceeds 3072-byte cap");
+        }
+        message.setBody(request.text());
+        message.markEdited();
+        Room room = requireRoomForConversation(message.getConversationId());
+        MessageView view = toView(message, room);
+        broadcaster.publish(WsEventEnvelope.EVENT_EDITED, room.getId(), view);
+        return view;
+    }
+
+    public void delete(UUID userId, UUID messageId) {
+        Message message = requireMessage(messageId);
+        if (message.isDeleted()) {
+            return;
+        }
+        Room room = requireRoomForConversation(message.getConversationId());
+        boolean isAuthor = userId.equals(message.getAuthorId());
+        if (!isAuthor) {
+            roomService.requireAdmin(room.getId(), userId);
+        }
+        message.markDeleted();
+        MessageView view = toView(message, room);
+        broadcaster.publish(WsEventEnvelope.EVENT_DELETED, room.getId(), view);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MessageView> history(UUID roomId, UUID userId, Long beforeSeq, Integer limit) {
+        roomService.requireMember(roomId, userId);
+        Room room = roomService.requireRoom(roomId);
+        int pageSize = limit == null ? DEFAULT_LIMIT : Math.min(Math.max(limit, 1), MAX_LIMIT);
+        List<Message> rows;
+        if (beforeSeq == null) {
+            rows = messageRepository.findLatest(room.getConversationId(), PageRequest.of(0, pageSize));
+        } else {
+            rows = messageRepository.findHistory(
+                    room.getConversationId(), beforeSeq, PageRequest.of(0, pageSize));
+        }
+        return toViews(rows, room);
+    }
+
+    private Message requireMessage(UUID messageId) {
+        return messageRepository.findById(messageId)
+                .orElseThrow(() -> new NoSuchElementException("Message not found"));
+    }
+
+    private Room requireRoomForConversation(UUID conversationId) {
+        return roomRepository.findByConversationId(conversationId)
+                .orElseThrow(() -> new BadCredentialsException("Room not found for conversation"));
+    }
+
+    private MessageView toView(Message message, Room room) {
+        return toViews(List.of(message), room).get(0);
+    }
+
+    private List<MessageView> toViews(List<Message> messages, Room room) {
+        if (messages.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> userIds = new ArrayList<>();
+        List<UUID> replyIds = new ArrayList<>();
+        for (Message m : messages) {
+            if (m.getAuthorId() != null) {
+                userIds.add(m.getAuthorId());
+            }
+            if (m.getReplyToId() != null) {
+                replyIds.add(m.getReplyToId());
+            }
+        }
+        Map<UUID, String> usernames = new HashMap<>();
+        if (!userIds.isEmpty()) {
+            userRepository.findAllById(userIds).forEach(u -> usernames.put(u.getId(), u.getUsername()));
+        }
+        Map<UUID, Message> parents = new HashMap<>();
+        if (!replyIds.isEmpty()) {
+            messageRepository.findAllById(replyIds).forEach(m -> parents.put(m.getId(), m));
+        }
+        for (Message parent : parents.values()) {
+            if (parent.getAuthorId() != null) {
+                userIds.add(parent.getAuthorId());
+            }
+        }
+        if (!userIds.isEmpty()) {
+            userRepository.findAllById(userIds).forEach(u -> usernames.put(u.getId(), u.getUsername()));
+        }
+        List<MessageView> out = new ArrayList<>(messages.size());
+        for (Message m : messages) {
+            MessageView.ReplyRef ref = null;
+            if (m.getReplyToId() != null) {
+                Message parent = parents.get(m.getReplyToId());
+                if (parent != null) {
+                    String parentAuthor = parent.getAuthorId() == null
+                            ? "(deleted)"
+                            : usernames.getOrDefault(parent.getAuthorId(), "(deleted)");
+                    String preview = parent.isDeleted()
+                            ? null
+                            : trimPreview(parent.getBody());
+                    ref = new MessageView.ReplyRef(parent.getId(), parent.getSeq(), parentAuthor, preview);
+                }
+            }
+            out.add(new MessageView(
+                    m.getId(),
+                    m.getConversationId(),
+                    room.getId(),
+                    m.getSeq(),
+                    m.getAuthorId(),
+                    m.getAuthorId() == null ? "(deleted)" : usernames.getOrDefault(m.getAuthorId(), "(deleted)"),
+                    m.isDeleted() ? null : m.getBody(),
+                    ref,
+                    m.getCreatedAt(),
+                    m.getEditedAt(),
+                    m.getDeletedAt()));
+        }
+        return out;
+    }
+
+    private static String trimPreview(String body) {
+        if (body.length() <= PREVIEW_LENGTH) {
+            return body;
+        }
+        return body.substring(0, PREVIEW_LENGTH) + "…";
+    }
+
+    // Exposed for the Conversation boot step at room creation.
+    Conversation ignored(Conversation c) {
+        return c;
+    }
+}

@@ -1,14 +1,16 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { AuthService } from '../auth/auth.service';
+import { ComposerComponent } from '../chat/composer.component';
+import { MessageListComponent } from '../chat/message-list.component';
 import { RoomMemberView, RoomService, RoomView } from './room.service';
 
 @Component({
   selector: 'app-room-view',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, MessageListComponent, ComposerComponent],
   templateUrl: './room-view.component.html',
 })
 export class RoomViewComponent implements OnInit {
@@ -21,6 +23,7 @@ export class RoomViewComponent implements OnInit {
   readonly members = signal<RoomMemberView[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
+  readonly myUserId = computed(() => this.auth.user()?.id ?? null);
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');

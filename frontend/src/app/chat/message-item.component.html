@@ -1,0 +1,35 @@
+<article class="message" [class.deleted]="message.deletedAt">
+  <header>
+    <strong>{{ message.authorUsername }}</strong>
+    <span class="muted small">{{ message.createdAt | date: 'short' }}</span>
+    <span *ngIf="message.editedAt && !message.deletedAt" class="muted small">(edited)</span>
+  </header>
+
+  <div *ngIf="message.replyTo as r" class="reply-chip">
+    <span class="muted small">↩ {{ r.authorUsername }}:</span>
+    <span class="muted small">{{ r.bodyPreview ?? '(deleted)' }}</span>
+  </div>
+
+  <ng-container *ngIf="!message.deletedAt; else deletedTpl">
+    <ng-container *ngIf="!editing(); else editTpl">
+      <p class="body">{{ message.body }}</p>
+      <div class="actions small">
+        <button type="button" class="link" (click)="emitReply()">Reply</button>
+        <button *ngIf="canEdit" type="button" class="link" (click)="startEdit()">Edit</button>
+        <button *ngIf="canDelete" type="button" class="link danger" (click)="deleteMessage()">Delete</button>
+      </div>
+    </ng-container>
+    <ng-template #editTpl>
+      <textarea [formControl]="draft" rows="2" maxlength="3072"></textarea>
+      <div *ngIf="error() as msg" class="error small">{{ msg }}</div>
+      <div class="actions small">
+        <button type="button" (click)="saveEdit()" [disabled]="draft.invalid">Save</button>
+        <button type="button" (click)="cancelEdit()">Cancel</button>
+      </div>
+    </ng-template>
+  </ng-container>
+
+  <ng-template #deletedTpl>
+    <p class="body muted">(deleted)</p>
+  </ng-template>
+</article>

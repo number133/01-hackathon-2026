@@ -2,3 +2,5 @@ logging:
   level:
     com.hackathon.chat: DEBUG
     org.springframework.session: INFO
+    org.springframework.messaging.simp.broker: DEBUG
+    org.springframework.web.socket.messaging: DEBUG
