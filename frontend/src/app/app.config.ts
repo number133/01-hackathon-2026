@@ -1,4 +1,4 @@
-import { ApplicationConfig } from '@angular/core';
+import { APP_INITIALIZER, ApplicationConfig } from '@angular/core';
 import {
   HttpClient,
   provideHttpClient,
@@ -6,8 +6,10 @@ import {
   withXsrfConfiguration,
 } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 
 import { routes } from './app.routes';
+import { AuthService } from './auth/auth.service';
 import { authErrorInterceptor } from './auth/auth.interceptor';
 
 export const appConfig: ApplicationConfig = {
@@ -17,6 +19,12 @@ export const appConfig: ApplicationConfig = {
       withXsrfConfiguration({ cookieName: 'XSRF-TOKEN', headerName: 'X-XSRF-TOKEN' }),
       withInterceptors([authErrorInterceptor]),
     ),
+    {
+      provide: APP_INITIALIZER,
+      multi: true,
+      deps: [AuthService],
+      useFactory: (auth: AuthService) => () => firstValueFrom(auth.initialize()),
+    },
   ],
 };
 

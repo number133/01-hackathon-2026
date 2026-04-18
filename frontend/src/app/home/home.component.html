@@ -2,11 +2,12 @@
   <h1>Chat</h1>
 
   <p *ngIf="user() as u">
-    Signed in as <strong>{{ u.username }}</strong>. Room and messaging UIs arrive in later phases.
+    Signed in as <strong>{{ u.username }}</strong>.
+    Head to <a routerLink="/rooms">rooms</a> to start chatting.
   </p>
   <p *ngIf="!user()">
-    Authentication is wired up. <a routerLink="/register">Create an account</a> or
-    <a routerLink="/login">sign in</a> to try it.
+    <a routerLink="/register">Create an account</a> or
+    <a routerLink="/login">sign in</a> to start chatting.
   </p>
 
   <h2>Backend health</h2>

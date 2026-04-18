@@ -75,9 +75,15 @@ export class ChatService {
       },
       onDisconnect: () => {
         this.connected = false;
+        this.subscriptions.clear();
       },
       onStompError: () => {
         this.connected = false;
+        this.subscriptions.clear();
+      },
+      onWebSocketClose: () => {
+        this.connected = false;
+        this.subscriptions.clear();
       },
     });
     this.client.activate();
