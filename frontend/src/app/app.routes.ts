@@ -66,5 +66,28 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () => import('./rooms/invitations.component').then((m) => m.InvitationsComponent),
   },
+  {
+    path: 'contacts',
+    canActivate: [authGuard],
+    loadComponent: () => import('./contacts/contacts.component').then((m) => m.ContactsComponent),
+  },
+  {
+    path: 'friend-requests',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./contacts/friend-requests.component').then((m) => m.FriendRequestsComponent),
+  },
+  {
+    path: 'dialogs',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./dialog/dialogs-catalog.component').then((m) => m.DialogsCatalogComponent),
+  },
+  {
+    path: 'dialogs/:id',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./dialog/dialog-view.component').then((m) => m.DialogViewComponent),
+  },
   { path: '**', redirectTo: '' },
 ];

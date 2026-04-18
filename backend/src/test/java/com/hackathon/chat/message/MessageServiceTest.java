@@ -10,7 +10,9 @@ import static org.mockito.Mockito.when;
 
 import com.hackathon.chat.common.AccountConflictException;
 import com.hackathon.chat.common.ForbiddenException;
+import com.hackathon.chat.conversation.Conversation;
 import com.hackathon.chat.conversation.ConversationService;
+import com.hackathon.chat.dialog.DialogService;
 import com.hackathon.chat.room.Room;
 import com.hackathon.chat.room.RoomMember;
 import com.hackathon.chat.room.RoomRepository;
@@ -34,6 +36,7 @@ class MessageServiceTest {
     private UserRepository userRepo;
     private RoomService roomService;
     private ConversationService conversationService;
+    private DialogService dialogService;
     private MessageBroadcaster broadcaster;
     private MessageService service;
 
@@ -49,9 +52,10 @@ class MessageServiceTest {
         userRepo = Mockito.mock(UserRepository.class);
         roomService = Mockito.mock(RoomService.class);
         conversationService = Mockito.mock(ConversationService.class);
+        dialogService = Mockito.mock(DialogService.class);
         broadcaster = Mockito.mock(MessageBroadcaster.class);
         service = new MessageService(messageRepo, roomRepo, userRepo,
-                roomService, conversationService, broadcaster);
+                roomService, conversationService, dialogService, broadcaster);
 
         conversationId = UUID.randomUUID();
         roomId = UUID.randomUUID();
@@ -62,6 +66,9 @@ class MessageServiceTest {
         when(roomService.requireRoom(roomId)).thenReturn(room);
         when(roomRepo.findByConversationId(conversationId)).thenReturn(Optional.of(room));
         when(userRepo.findAllById(any())).thenReturn(List.of());
+        Conversation roomConversation = Mockito.mock(Conversation.class);
+        when(roomConversation.getType()).thenReturn("room");
+        when(conversationService.require(conversationId)).thenReturn(roomConversation);
     }
 
     @Test

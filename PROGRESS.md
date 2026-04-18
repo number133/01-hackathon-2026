@@ -14,7 +14,7 @@ plans live under `howto/tasks/` (globally git-ignored on the dev machines).
 | 3     | Messaging and WebSocket transport                 | Done         | 2026-04-18  |
 | 3.1   | Split "remove" from "ban" (fix-up of Phase 2)     | Done         | 2026-04-18  |
 | 4     | Presence                                          | Done         | 2026-04-18  |
-| 5     | Contacts, friend requests, bans, personal chats   | Not started  | —           |
+| 5     | Contacts, friend requests, bans, personal chats   | Done         | 2026-04-18  |
 | 6     | Attachments                                       | Not started  | —           |
 | 7     | Notifications and unread state                    | Not started  | —           |
 | 8     | Admin UI polish                                   | Not started  | —           |
@@ -486,10 +486,103 @@ source of inactivity truth).
 
 ---
 
+## Phase 5 — Contacts, friend requests, user-to-user bans, personal chats (done, 2026-04-18)
+
+Goal: user-to-user relationships (friend requests, friendship,
+per-user bans) and 1:1 personal dialogs on top of the Phase 3 message
+primitives. Presence dots on contacts reuse Phase 4's
+`/topic/presence/{userId}` without changes.
+
+### Delivered
+
+- **Schema (V6):** `friend_request` with `pending | accepted |
+  declined | revoked | superseded` states (partial unique index on
+  `pending` direction-ordered), `friendship` (stored once, `user_a <
+  user_b` check constraint + PK), `user_ban` (asymmetric, one row per
+  direction), `dialog` (PK = conversation_id, ordered pair unique).
+  All FKs cascade on `users.id` so the Phase 1 account-delete flow
+  picks them up for free.
+- **`FriendService`** — request send/accept/decline/revoke/unfriend,
+  ordered-pair helper, friendship uniqueness caught via
+  `DataIntegrityViolationException` (concurrent accept = idempotent),
+  supersedes the opposite-direction pending on accept.
+- **`UserBanService`** — idempotent ban, ripples through
+  unfriend + cancel pending requests in one transaction, unban leaves
+  friendship gone on purpose.
+- **`DialogService`** — lazy dialog create (unique index arbitrates
+  concurrent `getOrCreate`), `isFrozen` derived from
+  `ban-either-direction || not-friends` (no stored column),
+  participant check used by the WS interceptor.
+- **REST:** `/api/friend-requests`, `/api/friends`, `/api/user-bans`,
+  `/api/dialogs`, `/api/dialogs/{id}/messages`. DM send/history
+  share Phase 3 DTOs verbatim — the frontend `MessageView` shape
+  doesn't change; `roomId` is simply null for dialog messages.
+- **`MessageService` refactor** — conversation-typed dispatch: edit
+  and delete look up the conversation, flip to the dialog path when
+  `type='dialog'` (frozen check + author-only delete, no admin tier),
+  publish to `/topic/dialogs/{conversationId}` via the new
+  `MessageBroadcaster.publishToDialog`. Phase 3 room callers
+  untouched.
+- **`UserEventPublisher`** — `/topic/users/{userId}` fanout for
+  `friend-request.created/resolved`, `friend.added/removed`,
+  `user-ban.added/removed`, afterCommit like Phase 3.
+- **`WsChannelInterceptor`** widened twice — `/topic/dialogs/{uuid}`
+  gated on participation via `DialogService` (@Lazy to break the
+  `FriendService ↔ DialogService ↔ WsChannelInterceptor` cycle that
+  arose because the interceptor is constructed as part of
+  WebSocketConfig, which transitively needs SimpMessagingTemplate
+  that FriendService depends on), `/topic/users/{uuid}` gated on
+  `principal.userId == uuid`.
+- **Frontend** — `FriendService` (REST + `/topic/users/{me}` listener
+  refreshing signals on any event), `DialogService` (REST + per-
+  dialog subscription), pages `/contacts`, `/friend-requests`,
+  `/dialogs`, `/dialogs/:id`. `ContactsComponent` reuses
+  `PresenceDotComponent` for the contact status dots; the dialog
+  view disables the composer and shows a banner when `frozen`.
+- **Tests** — `FriendFlowIT` (request→accept→unfriend,
+  mutual-pending rejected), `DialogAndBanFlowIT` (create→send→ban
+  freezes→bob-can't-send→alice-can't-edit→unban-still-frozen→
+  refriend-unfreezes; non-participant sees 403 on both REST and WS).
+- **Smoke script** — extended with Phase 5 block covering the full
+  friend→dialog→ban→refriend ripple.
+
+### Verification
+
+- `./gradlew test` — full suite green across every shipped phase.
+- `scripts/docker-smoke.sh` — clean rebuild, all six phase blocks
+  pass.
+- Manual walk via ng serve + bootRun: two users friended, opened a
+  dialog, sent a message with live STOMP delivery, banned →
+  composer frozen, unbanned + re-accepted → composer unlocked.
+
+### Known tradeoffs carried forward
+
+- **@Lazy on `WsChannelInterceptor`'s DialogService dep.** Breaks the
+  DI cycle introduced by the two interceptor gates. The proxy
+  overhead is one virtual call per SUBSCRIBE, negligible at
+  hackathon scale. Alternative: extract the participant check to a
+  tiny `DialogMembershipQuery` bean that reads straight from the
+  repo — no friendship/ban coupling and no cycle. Deferred because
+  the @Lazy fix is one line.
+- **Naive FriendService event handling on frontend.** Every
+  `/topic/users/{me}` event triggers `refreshAll()` over four REST
+  endpoints. Fine for a ≤50-friend list per spec §3.1; a per-event
+  delta merge is straightforward if this ever gets hot.
+- **No frontend block-from-room-members context action.** Plan §9
+  listed "Block from room member row" as a touch; not delivered.
+  The Contacts screen's Block button covers the primary flow; the
+  room-members version is polish for Phase 8's admin UI rework.
+- **No `MessageService` frozen-dialog path for the
+  `PATCH /api/messages/{id}` edit coming from a room author on a
+  dialog message.** Since dialog messages don't surface in room
+  admin flows, the overlap doesn't exist in practice; the service
+  code handles both branches symmetrically anyway.
+
+---
+
 ## Next
 
-Phase 5 — contacts, friend requests, user-to-user bans, personal chats.
-Reuses the Phase 4 `/topic/presence/{userId}` topic for contact
-status dots without any new plumbing. Cursor-move / keydown / focus `active` pings
+Phase 6 — attachments (images + arbitrary files, upload + download,
+size + mime validation, local FS storage, copy-paste entry). Cursor-move / keydown / focus `active` pings
 throttled to 1–2 s; server infers AFK from absence of signals (tabs may
 hibernate, so no "going inactive" message is ever trusted).

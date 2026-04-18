@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 import com.hackathon.chat.common.ForbiddenException;
+import com.hackathon.chat.dialog.DialogService;
 import com.hackathon.chat.room.RoomBanRepository;
 import com.hackathon.chat.room.RoomMember;
 import com.hackathon.chat.room.RoomService;
@@ -26,6 +27,7 @@ class WsChannelInterceptorTest {
     private UserService userService;
     private RoomService roomService;
     private RoomBanRepository banRepo;
+    private DialogService dialogService;
     private WsChannelInterceptor interceptor;
 
     @BeforeEach
@@ -33,7 +35,8 @@ class WsChannelInterceptorTest {
         userService = Mockito.mock(UserService.class);
         roomService = Mockito.mock(RoomService.class);
         banRepo = Mockito.mock(RoomBanRepository.class);
-        interceptor = new WsChannelInterceptor(userService, roomService, banRepo);
+        dialogService = Mockito.mock(DialogService.class);
+        interceptor = new WsChannelInterceptor(userService, roomService, banRepo, dialogService);
     }
 
     @Test

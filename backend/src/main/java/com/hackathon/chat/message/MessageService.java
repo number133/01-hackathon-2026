@@ -4,6 +4,8 @@ import com.hackathon.chat.common.AccountConflictException;
 import com.hackathon.chat.common.ForbiddenException;
 import com.hackathon.chat.conversation.Conversation;
 import com.hackathon.chat.conversation.ConversationService;
+import com.hackathon.chat.dialog.Dialog;
+import com.hackathon.chat.dialog.DialogService;
 import com.hackathon.chat.room.Room;
 import com.hackathon.chat.room.RoomRepository;
 import com.hackathon.chat.room.RoomService;
@@ -38,6 +40,7 @@ public class MessageService {
     private final UserRepository userRepository;
     private final RoomService roomService;
     private final ConversationService conversationService;
+    private final DialogService dialogService;
     private final MessageBroadcaster broadcaster;
 
     public MessageService(MessageRepository messageRepository,
@@ -45,12 +48,14 @@ public class MessageService {
                           UserRepository userRepository,
                           RoomService roomService,
                           ConversationService conversationService,
+                          DialogService dialogService,
                           MessageBroadcaster broadcaster) {
         this.messageRepository = messageRepository;
         this.roomRepository = roomRepository;
         this.userRepository = userRepository;
         this.roomService = roomService;
         this.conversationService = conversationService;
+        this.dialogService = dialogService;
         this.broadcaster = broadcaster;
     }
 
@@ -88,11 +93,21 @@ public class MessageService {
         if (request.text().getBytes(StandardCharsets.UTF_8).length > BODY_MAX_BYTES) {
             throw new IllegalArgumentException("Message body exceeds 3072-byte cap");
         }
+        Conversation conversation = conversationService.require(message.getConversationId());
+        Room room = null;
+        if (Conversation.TYPE_DIALOG.equals(conversation.getType())) {
+            dialogService.assertCanMutate(message.getConversationId());
+        } else {
+            room = requireRoomForConversation(message.getConversationId());
+        }
         message.setBody(request.text());
         message.markEdited();
-        Room room = requireRoomForConversation(message.getConversationId());
         MessageView view = toView(message, room);
-        broadcaster.publish(WsEventEnvelope.EVENT_EDITED, room.getId(), view);
+        if (room != null) {
+            broadcaster.publish(WsEventEnvelope.EVENT_EDITED, room.getId(), view);
+        } else {
+            broadcaster.publishToDialog(WsEventEnvelope.EVENT_EDITED, message.getConversationId(), view);
+        }
         return view;
     }
 
@@ -101,14 +116,66 @@ public class MessageService {
         if (message.isDeleted()) {
             return;
         }
-        Room room = requireRoomForConversation(message.getConversationId());
-        boolean isAuthor = userId.equals(message.getAuthorId());
-        if (!isAuthor) {
-            roomService.requireAdmin(room.getId(), userId);
+        Conversation conversation = conversationService.require(message.getConversationId());
+        Room room = null;
+        if (Conversation.TYPE_DIALOG.equals(conversation.getType())) {
+            Dialog dialog = dialogService.require(message.getConversationId());
+            if (!dialog.hasParticipant(userId)) {
+                throw new ForbiddenException("Not a participant");
+            }
+            dialogService.assertCanMutate(message.getConversationId());
+            if (!userId.equals(message.getAuthorId())) {
+                throw new ForbiddenException("Only the author can delete this message");
+            }
+        } else {
+            room = requireRoomForConversation(message.getConversationId());
+            boolean isAuthor = userId.equals(message.getAuthorId());
+            if (!isAuthor) {
+                roomService.requireAdmin(room.getId(), userId);
+            }
         }
         message.markDeleted();
         MessageView view = toView(message, room);
-        broadcaster.publish(WsEventEnvelope.EVENT_DELETED, room.getId(), view);
+        if (room != null) {
+            broadcaster.publish(WsEventEnvelope.EVENT_DELETED, room.getId(), view);
+        } else {
+            broadcaster.publishToDialog(WsEventEnvelope.EVENT_DELETED, message.getConversationId(), view);
+        }
+    }
+
+    public MessageView postToDialog(UUID userId, UUID conversationId, SendMessageRequest request) {
+        dialogService.assertCanSend(conversationId, userId);
+        String body = request.text();
+        if (body.getBytes(StandardCharsets.UTF_8).length > BODY_MAX_BYTES) {
+            throw new IllegalArgumentException("Message body exceeds 3072-byte cap");
+        }
+        if (request.replyToId() != null) {
+            Message parent = messageRepository.findById(request.replyToId())
+                    .orElseThrow(() -> new NoSuchElementException("Reply target not found"));
+            if (!Objects.equals(parent.getConversationId(), conversationId)) {
+                throw new IllegalArgumentException("Reply target is in a different conversation");
+            }
+        }
+        long seq = conversationService.assignNextSeq(conversationId);
+        Message saved = messageRepository.save(
+                new Message(conversationId, seq, userId, body, request.replyToId()));
+        MessageView view = toView(saved, null);
+        broadcaster.publishToDialog(WsEventEnvelope.EVENT_CREATED, conversationId, view);
+        return view;
+    }
+
+    @Transactional(readOnly = true)
+    public List<MessageView> historyForDialog(UUID conversationId, UUID userId,
+                                              Long beforeSeq, Integer limit) {
+        dialogService.assertReadable(conversationId, userId);
+        int pageSize = limit == null ? DEFAULT_LIMIT : Math.min(Math.max(limit, 1), MAX_LIMIT);
+        List<Message> rows;
+        if (beforeSeq == null) {
+            rows = messageRepository.findLatest(conversationId, PageRequest.of(0, pageSize));
+        } else {
+            rows = messageRepository.findHistory(conversationId, beforeSeq, PageRequest.of(0, pageSize));
+        }
+        return toViews(rows, null);
     }
 
     @Transactional(readOnly = true)
@@ -188,7 +255,7 @@ public class MessageService {
             out.add(new MessageView(
                     m.getId(),
                     m.getConversationId(),
-                    room.getId(),
+                    room == null ? null : room.getId(),
                     m.getSeq(),
                     m.getAuthorId(),
                     m.getAuthorId() == null ? "(deleted)" : usernames.getOrDefault(m.getAuthorId(), "(deleted)"),

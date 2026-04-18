@@ -3,6 +3,7 @@ import { Component, OnInit, effect, inject } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 
 import { AuthService } from '../auth/auth.service';
+import { FriendService } from '../contacts/friend.service';
 import { InvitationService } from '../rooms/invitation.service';
 
 @Component({
@@ -15,9 +16,11 @@ export class TopMenuComponent implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly invitations = inject(InvitationService);
+  private readonly friends = inject(FriendService);
 
   readonly user = this.auth.user;
   readonly pendingInvites = this.invitations.pendingCount;
+  readonly pendingFriendRequests = this.friends.incomingPendingCount;
 
   constructor() {
     effect(() => {

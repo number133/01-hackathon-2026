@@ -1,0 +1,17 @@
+<section class="wide-card">
+  <h1>Personal chats</h1>
+  <div *ngIf="error() as msg" class="error">{{ msg }}</div>
+
+  <p class="muted" *ngIf="items().length === 0">
+    No personal chats yet. Open one from your <a routerLink="/contacts">Contacts</a>.
+  </p>
+  <ul *ngIf="items().length > 0">
+    <li *ngFor="let d of items()">
+      <a [routerLink]="['/dialogs', d.id]">
+        <app-presence-dot [userId]="d.counterpartId"></app-presence-dot>
+        {{ d.counterpartUsername }}
+      </a>
+      <span *ngIf="d.frozen" class="muted">(frozen)</span>
+    </li>
+  </ul>
+</section>

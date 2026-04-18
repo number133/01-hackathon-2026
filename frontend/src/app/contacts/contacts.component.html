@@ -1,0 +1,31 @@
+<section class="wide-card">
+  <h1>Contacts</h1>
+  <div *ngIf="error() as msg" class="error">{{ msg }}</div>
+
+  <h2>Friends</h2>
+  <p class="muted" *ngIf="list().length === 0">
+    No friends yet. <a routerLink="/friend-requests">Send a request</a>.
+  </p>
+  <table *ngIf="list().length > 0">
+    <thead><tr><th>Name</th><th>Actions</th></tr></thead>
+    <tbody>
+      <tr *ngFor="let f of list()">
+        <td><app-presence-dot [userId]="f.userId"></app-presence-dot>{{ f.username }}</td>
+        <td>
+          <button type="button" class="small" (click)="openDialog(f.userId)">Open chat</button>
+          <button type="button" class="small" (click)="unfriend(f.userId, f.username)">Unfriend</button>
+          <button type="button" class="small danger" (click)="ban(f.userId, f.username)">Block</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Blocked users</h2>
+  <p class="muted" *ngIf="bans().length === 0">None.</p>
+  <ul *ngIf="bans().length > 0">
+    <li *ngFor="let b of bans()">
+      {{ b.username }}
+      <button type="button" class="small" (click)="unban(b.userId)">Unblock</button>
+    </li>
+  </ul>
+</section>

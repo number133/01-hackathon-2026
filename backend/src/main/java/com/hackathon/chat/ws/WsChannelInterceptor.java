@@ -1,5 +1,6 @@
 package com.hackathon.chat.ws;
 
+import com.hackathon.chat.dialog.DialogService;
 import com.hackathon.chat.room.RoomBanRepository;
 import com.hackathon.chat.room.RoomService;
 import com.hackathon.chat.user.User;
@@ -13,6 +14,7 @@ import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Component;
@@ -23,17 +25,22 @@ public class WsChannelInterceptor implements ChannelInterceptor {
     private static final Logger log = LoggerFactory.getLogger(WsChannelInterceptor.class);
     private static final String ROOMS_PREFIX = "/topic/rooms/";
     private static final String PRESENCE_PREFIX = "/topic/presence/";
+    private static final String DIALOGS_PREFIX = "/topic/dialogs/";
+    private static final String USERS_PREFIX = "/topic/users/";
 
     private final UserService userService;
     private final RoomService roomService;
     private final RoomBanRepository banRepository;
+    private final DialogService dialogService;
 
     public WsChannelInterceptor(UserService userService,
                                 RoomService roomService,
-                                RoomBanRepository banRepository) {
+                                RoomBanRepository banRepository,
+                                @Lazy DialogService dialogService) {
         this.userService = userService;
         this.roomService = roomService;
         this.banRepository = banRepository;
+        this.dialogService = dialogService;
     }
 
     @Override
@@ -71,6 +78,26 @@ public class WsChannelInterceptor implements ChannelInterceptor {
                 // gate above already enforced that. Validate shape only.
                 parseUuidOr403(destination.substring(PRESENCE_PREFIX.length()),
                         "Invalid presence destination");
+                return message;
+            }
+            if (destination.startsWith(DIALOGS_PREFIX)) {
+                UUID conversationId = parseUuidOr403(
+                        destination.substring(DIALOGS_PREFIX.length()),
+                        "Invalid dialog destination");
+                User user = currentUser(accessor);
+                if (!dialogService.isParticipant(conversationId, user.getId())) {
+                    throw new AccessDeniedException("Not a participant in this dialog");
+                }
+                return message;
+            }
+            if (destination.startsWith(USERS_PREFIX)) {
+                UUID userId = parseUuidOr403(
+                        destination.substring(USERS_PREFIX.length()),
+                        "Invalid user destination");
+                User user = currentUser(accessor);
+                if (!user.getId().equals(userId)) {
+                    throw new AccessDeniedException("Cannot subscribe to another user's topic");
+                }
                 return message;
             }
             throw new AccessDeniedException("Unsupported subscribe destination");

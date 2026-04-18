@@ -8,6 +8,12 @@
         Invitations
         <span *ngIf="pendingInvites() > 0" class="badge">{{ pendingInvites() }}</span>
       </a>
+      <a routerLink="/contacts" routerLinkActive="active">Contacts</a>
+      <a routerLink="/friend-requests" routerLinkActive="active">
+        Requests
+        <span *ngIf="pendingFriendRequests() > 0" class="badge">{{ pendingFriendRequests() }}</span>
+      </a>
+      <a routerLink="/dialogs" routerLinkActive="active">DMs</a>
       <a routerLink="/account" routerLinkActive="active">Account</a>
       <a routerLink="/sessions" routerLinkActive="active">Sessions</a>
       <span class="spacer"></span>

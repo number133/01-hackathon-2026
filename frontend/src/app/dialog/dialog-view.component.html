@@ -1,0 +1,33 @@
+<section class="wide-card" *ngIf="dialog() as d">
+  <h1>
+    <app-presence-dot [userId]="d.counterpartId"></app-presence-dot>
+    {{ d.counterpartUsername }}
+  </h1>
+  <p *ngIf="d.frozen" class="muted">
+    This dialog is frozen — you can read history but cannot send. Add
+    <strong>{{ d.counterpartUsername }}</strong> as a friend again, or unblock them, to continue.
+  </p>
+  <div *ngIf="error() as msg" class="error">{{ msg }}</div>
+
+  <div class="messages">
+    <article *ngFor="let m of messages()">
+      <header>
+        <strong>{{ m.authorUsername }}</strong>
+        <small>{{ m.createdAt | date: 'short' }}</small>
+        <small *ngIf="m.editedAt" class="muted">(edited)</small>
+      </header>
+      <p *ngIf="!m.deletedAt">{{ m.body }}</p>
+      <p *ngIf="m.deletedAt" class="muted">(deleted)</p>
+    </article>
+  </div>
+
+  <form (ngSubmit)="send()" *ngIf="!d.frozen">
+    <textarea
+      [formControl]="text"
+      (keydown)="handleKeydown($event)"
+      rows="2"
+      placeholder="Type a message. Enter to send, Shift+Enter for newline."
+    ></textarea>
+    <button type="submit" [disabled]="text.invalid">Send</button>
+  </form>
+</section>

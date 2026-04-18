@@ -235,6 +235,67 @@ call POST /api/presence/ping --jar "$ALICE_JAR" --expect 400 \
   --body '{"tabId":""}' >/dev/null
 green "  blank tabId rejected with 400"
 
+# ───────────────────────── phase 5: contacts + dialogs ──────────────────
+
+step "Phase 5 — friend request, dialog, ban, refriend"
+
+# Alice sends Bob a friend request.
+FR="$(call POST /api/friend-requests --jar "$ALICE_JAR" --expect 201 \
+  --body "{\"username\":\"${BOB_USER}\"}")"
+FR_ID="$(json_field "$FR" "['id']")"
+
+# Bob accepts.
+call POST "/api/friend-requests/$FR_ID/accept" --jar "$BOB_JAR" --expect 204 >/dev/null
+
+# Alice's friends list contains Bob.
+FRIENDS="$(call GET /api/friends --jar "$ALICE_JAR")"
+echo "$FRIENDS" | grep -q "$BOB_USER" \
+  || fail "bob not in alice's friends: $FRIENDS"
+green "  friend request → accept → friends list ok"
+
+# Alice opens a dialog with Bob.
+DLG="$(call POST /api/dialogs --jar "$ALICE_JAR" --expect 201 \
+  --body "{\"userId\":\"$BOB_ID\"}")"
+DLG_ID="$(json_field "$DLG" "['id']")"
+
+# Alice sends a DM.
+call POST "/api/dialogs/$DLG_ID/messages" --jar "$ALICE_JAR" --expect 201 \
+  --body '{"text":"hi bob"}' >/dev/null
+
+# Bob can read history.
+HIST="$(call GET "/api/dialogs/$DLG_ID/messages" --jar "$BOB_JAR")"
+python3 -c "import sys,json
+d=json.loads(sys.stdin.read())
+assert d['items'][0]['body']=='hi bob', d" <<<"$HIST"
+green "  dialog created + DM delivered"
+
+# Alice bans Bob. Dialog flips frozen.
+call POST "/api/user-bans/$BOB_ID" --jar "$ALICE_JAR" --expect 204 >/dev/null
+DLG_AFTER="$(call GET "/api/dialogs/$DLG_ID" --jar "$ALICE_JAR")"
+[[ "$(json_field "$DLG_AFTER" "['frozen']")" == "True" ]] \
+  || fail "dialog should be frozen after ban: $DLG_AFTER"
+
+# Bob cannot send.
+call POST "/api/dialogs/$DLG_ID/messages" --jar "$BOB_JAR" --expect 409 \
+  --body '{"text":"blocked?"}' >/dev/null
+green "  ban → dialog frozen, target cannot send"
+
+# Unban: dialog still frozen (no friendship).
+call DELETE "/api/user-bans/$BOB_ID" --jar "$ALICE_JAR" --expect 204 >/dev/null
+DLG_AFTER2="$(call GET "/api/dialogs/$DLG_ID" --jar "$ALICE_JAR")"
+[[ "$(json_field "$DLG_AFTER2" "['frozen']")" == "True" ]] \
+  || fail "dialog should stay frozen without friendship: $DLG_AFTER2"
+
+# Re-friend: dialog unfreezes.
+FR2="$(call POST /api/friend-requests --jar "$ALICE_JAR" --expect 201 \
+  --body "{\"username\":\"${BOB_USER}\"}")"
+FR2_ID="$(json_field "$FR2" "['id']")"
+call POST "/api/friend-requests/$FR2_ID/accept" --jar "$BOB_JAR" --expect 204 >/dev/null
+DLG_FINAL="$(call GET "/api/dialogs/$DLG_ID" --jar "$ALICE_JAR")"
+[[ "$(json_field "$DLG_FINAL" "['frozen']")" == "False" ]] \
+  || fail "dialog should unfreeze after re-friend: $DLG_FINAL"
+green "  unban alone keeps frozen; re-friend unfreezes"
+
 # ───────────────────────── static assets ─────────────────────────────────
 
 step "Static — SPA fallback and Angular bundle"
@@ -250,4 +311,4 @@ green "  SPA fallback serves index.html for /rooms/<id>"
 # ───────────────────────── done ──────────────────────────────────────────
 
 green ""
-green "All docker smoke checks passed (phases 0, 1, 2, 3, 3.1, 4)."
+green "All docker smoke checks passed (phases 0, 1, 2, 3, 3.1, 4, 5)."

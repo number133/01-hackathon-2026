@@ -26,8 +26,15 @@ public class MessageBroadcaster {
      * when called outside a transaction (e.g. tests).
      */
     public void publish(String event, UUID roomId, MessageView view) {
+        publishTo("/topic/rooms/" + roomId, event, view);
+    }
+
+    public void publishToDialog(String event, UUID conversationId, MessageView view) {
+        publishTo("/topic/dialogs/" + conversationId, event, view);
+    }
+
+    private void publishTo(String destination, String event, MessageView view) {
         WsEventEnvelope envelope = WsEventEnvelope.of(event, view);
-        String destination = "/topic/rooms/" + roomId;
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             log.debug("registering afterCommit broadcast for {} seq={}", destination, view.seq());
             TransactionSynchronizationManager.registerSynchronization(

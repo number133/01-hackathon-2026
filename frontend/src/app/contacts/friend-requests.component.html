@@ -1,0 +1,35 @@
+<section class="wide-card">
+  <h1>Friend requests</h1>
+  <div *ngIf="error() as msg" class="error">{{ msg }}</div>
+
+  <h2>Send a request</h2>
+  <form [formGroup]="form" (ngSubmit)="send()" class="row gap">
+    <input type="text" formControlName="username" placeholder="Username" />
+    <input type="text" formControlName="message" placeholder="Optional message" />
+    <button type="submit" [disabled]="form.invalid">Send</button>
+  </form>
+
+  <h2>Incoming</h2>
+  <p class="muted" *ngIf="incoming().length === 0">No incoming requests.</p>
+  <ul *ngIf="incoming().length > 0">
+    <li *ngFor="let r of incoming()">
+      <strong>{{ r.requester.username }}</strong>
+      — <em>{{ r.status }}</em>
+      <span *ngIf="r.message"> — "{{ r.message }}"</span>
+      <ng-container *ngIf="r.status === 'pending'">
+        <button type="button" class="small" (click)="accept(r.id)">Accept</button>
+        <button type="button" class="small" (click)="decline(r.id)">Decline</button>
+      </ng-container>
+    </li>
+  </ul>
+
+  <h2>Outgoing</h2>
+  <p class="muted" *ngIf="outgoing().length === 0">No outgoing requests.</p>
+  <ul *ngIf="outgoing().length > 0">
+    <li *ngFor="let r of outgoing()">
+      <strong>{{ r.recipient.username }}</strong>
+      — <em>{{ r.status }}</em>
+      <button *ngIf="r.status === 'pending'" type="button" class="small" (click)="revoke(r.id)">Revoke</button>
+    </li>
+  </ul>
+</section>

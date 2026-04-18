@@ -4,6 +4,7 @@ import { RouterOutlet } from '@angular/router';
 
 import { AuthService } from './auth/auth.service';
 import { ChatService } from './chat/chat.service';
+import { FriendService } from './contacts/friend.service';
 import { TopMenuComponent } from './layout/top-menu.component';
 import { PresenceService } from './presence/presence.service';
 
@@ -17,6 +18,7 @@ export class AppComponent {
   private readonly auth = inject(AuthService);
   private readonly presence = inject(PresenceService);
   private readonly chat = inject(ChatService);
+  private readonly friends = inject(FriendService);
 
   readonly ready = this.auth.ready;
 
@@ -25,6 +27,7 @@ export class AppComponent {
       if (this.auth.isAuthenticated()) {
         this.chat.connect();
         this.presence.start();
+        this.friends.start();
       }
     });
   }
