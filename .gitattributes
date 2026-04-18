@@ -1,0 +1,22 @@
+# Auto-detect text files for consistent line endings across platforms.
+* text=auto
+
+# Force LF for files that must run inside Linux build/runtime stages.
+# A CRLF gradlew commit would break the Docker build on this Windows host.
+gradlew text eol=lf
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Keep Windows-native scripts as CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files: never touch.
+*.jar binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary

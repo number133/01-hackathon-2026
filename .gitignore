@@ -1,0 +1,33 @@
+# Build output
+**/build/
+**/dist/
+**/out/
+**/target/
+
+# Node
+**/node_modules/
+**/npm-debug.log*
+**/.angular/
+**/.angular-cache/
+
+# Gradle
+.gradle/
+**/.gradle/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Env
+.env
+.env.local
