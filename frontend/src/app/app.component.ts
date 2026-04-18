@@ -1,9 +1,11 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject } from '@angular/core';
+import { Component, effect, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 
 import { AuthService } from './auth/auth.service';
+import { ChatService } from './chat/chat.service';
 import { TopMenuComponent } from './layout/top-menu.component';
+import { PresenceService } from './presence/presence.service';
 
 @Component({
   selector: 'app-root',
@@ -13,6 +15,17 @@ import { TopMenuComponent } from './layout/top-menu.component';
 })
 export class AppComponent {
   private readonly auth = inject(AuthService);
+  private readonly presence = inject(PresenceService);
+  private readonly chat = inject(ChatService);
 
   readonly ready = this.auth.ready;
+
+  constructor() {
+    effect(() => {
+      if (this.auth.isAuthenticated()) {
+        this.chat.connect();
+        this.presence.start();
+      }
+    });
+  }
 }

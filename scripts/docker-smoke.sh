@@ -212,6 +212,29 @@ call DELETE "/api/rooms/$ROOM_ID/bans/$BOB_ID" --jar "$ALICE_JAR" --expect 204 >
 call POST "/api/rooms/$ROOM_ID/join" --jar "$BOB_JAR" --expect 204 >/dev/null
 green "  ban → rejoin 403, unban → rejoin 204"
 
+# ───────────────────────── phase 4: presence ────────────────────────────
+
+step "Phase 4 — presence ping, bulk, config"
+CONFIG="$(call GET /api/presence/config --jar "$ALICE_JAR")"
+PING_MS="$(json_field "$CONFIG" "['pingIntervalMs']")"
+[[ "$PING_MS" -gt 0 ]] || fail "presence config must expose a positive pingIntervalMs: $CONFIG"
+
+call POST /api/presence/ping --jar "$ALICE_JAR" --expect 204 \
+  --body '{"tabId":"smoke-tab"}' >/dev/null
+ALICE_ID="$(json_field "$(call GET /api/auth/me --jar "$ALICE_JAR")" "['id']")"
+
+BULK="$(call GET "/api/presence?userIds=$ALICE_ID,$BOB_ID" --jar "$ALICE_JAR")"
+ALICE_STATUS="$(python3 -c "import sys,json
+d=json.loads(sys.stdin.read())
+for v in d:
+  if v['userId']=='$ALICE_ID': print(v['status'])" <<<"$BULK")"
+[[ "$ALICE_STATUS" == "online" ]] || fail "alice should be online after ping: $BULK"
+green "  ping → bulk status returns online; config pingIntervalMs=${PING_MS} ms"
+
+call POST /api/presence/ping --jar "$ALICE_JAR" --expect 400 \
+  --body '{"tabId":""}' >/dev/null
+green "  blank tabId rejected with 400"
+
 # ───────────────────────── static assets ─────────────────────────────────
 
 step "Static — SPA fallback and Angular bundle"
@@ -227,4 +250,4 @@ green "  SPA fallback serves index.html for /rooms/<id>"
 # ───────────────────────── done ──────────────────────────────────────────
 
 green ""
-green "All docker smoke checks passed (phases 0, 1, 2, 3, 3.1)."
+green "All docker smoke checks passed (phases 0, 1, 2, 3, 3.1, 4)."

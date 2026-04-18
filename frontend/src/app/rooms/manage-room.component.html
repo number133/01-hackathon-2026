@@ -13,11 +13,12 @@
   <section *ngIf="tab() === 'members'">
     <table>
       <thead>
-        <tr><th>Username</th><th>Role</th><th>Actions</th></tr>
+        <tr><th>Username</th><th>Status</th><th>Role</th><th>Actions</th></tr>
       </thead>
       <tbody>
         <tr *ngFor="let m of members()">
-          <td>{{ m.username }}</td>
+          <td><app-presence-dot [userId]="m.userId"></app-presence-dot>{{ m.username }}</td>
+          <td class="muted">{{ presenceStatus(m.userId) }}</td>
           <td>{{ m.role }}</td>
           <td>
             <button *ngIf="m.role === 'member' && r.myRole === 'owner'" type="button" class="small" (click)="promote(m.userId)">Promote</button>

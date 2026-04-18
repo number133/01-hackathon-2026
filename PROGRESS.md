@@ -13,7 +13,7 @@ plans live under `howto/tasks/` (globally git-ignored on the dev machines).
 | 2     | Rooms, membership, roles, admin actions           | Done         | 2026-04-18  |
 | 3     | Messaging and WebSocket transport                 | Done         | 2026-04-18  |
 | 3.1   | Split "remove" from "ban" (fix-up of Phase 2)     | Done         | 2026-04-18  |
-| 4     | Presence                                          | Not started  | —           |
+| 4     | Presence                                          | Done         | 2026-04-18  |
 | 5     | Contacts, friend requests, bans, personal chats   | Not started  | —           |
 | 6     | Attachments                                       | Not started  | —           |
 | 7     | Notifications and unread state                    | Not started  | —           |
@@ -388,8 +388,108 @@ invite (private rooms); a banned user cannot rejoin until unbanned.
 
 ---
 
+## Phase 4 — Presence (done, 2026-04-18)
+
+Goal: online / AFK / offline dots next to every member of every room,
+derived from client "active" pings — no "going inactive" signal per
+hint2.txt (browsers freeze background tabs, so absence must be the only
+source of inactivity truth).
+
+### Delivered
+
+- **`PresenceService`** — in-memory map `userId → tabId → lastPingAt`.
+  `recordPing` upserts and publishes `/topic/presence/{userId}` only on
+  state transition; `statusOf` derives ONLINE / AFK / OFFLINE from the
+  newest ping under the configured thresholds; `sweep` runs on a
+  scheduled task and evicts stale tab entries, re-computing per-user
+  status and emitting change frames; tab map is capped at 50 entries
+  per user (oldest evicted) to bound adversarial memory growth.
+- **`PresenceSweeper`** — `SchedulingConfigurer` that registers the
+  sweep task at `chat.presence.sweep-interval`. Chose this over
+  `@Scheduled(fixedRateString = ...)` because SpEL can't resolve the
+  bean name Spring generates for a `@ConfigurationProperties` record.
+- **`PresenceController`** — `POST /api/presence/ping`,
+  `GET /api/presence?userIds=…` (max 200), `GET /api/presence/config`
+  (exposes `pingIntervalMs` so the client doesn't hard-code 2000 ms).
+- **`PresenceProperties`** — `@ConfigurationProperties("chat.presence")`
+  record: `pingInterval=2s`, `afkThreshold=60s`, `offlineGrace=30s`,
+  `sweepInterval=5s`. All four are Spring `Duration`s, overridable via
+  env var or a profile `application-*.yml`.
+- **`WsChannelInterceptor`** widened — the hard reject of non-rooms
+  subscribes is gone; `/topic/presence/{uuid}` is now allowed with no
+  per-destination auth check (CONNECT gate already enforces session).
+  Shared `parseUuidOr403` helper for both prefixes.
+- **Enable scheduling + Clock bean** — `@EnableScheduling` on
+  `ChatApplication`; `Clock.systemUTC()` as a bean so tests can
+  substitute a `MutableClock` without touching `System.currentTimeMillis`.
+- **Frontend** — `PresenceService` (Angular) throttles
+  `mousemove` / `keydown` / `focus` / `touchstart` to one `POST /ping`
+  per `pingIntervalMs`; `watch(userIds)` hydrates via bulk GET and
+  subscribes to `/topic/presence/{userId}` through the shared
+  STOMP client (`ChatService.subscribeTopic`). `PresenceDotComponent`
+  renders green/yellow/grey with CSS variables. `ManageRoomComponent`
+  gets a new Status column showing the dot + status text, tracks
+  `watch/unwatch` across member-list reloads and `ngOnDestroy`.
+- **`AppComponent`** — `effect(() => if auth.isAuthenticated() …)`
+  connects the STOMP client and starts presence only after auth
+  hydrates (Phase 3 + 3.1 left this tied to initial route activation;
+  presence needs it triggered as soon as the user is authenticated,
+  not only when they enter a room).
+- **Tests** — `PresenceServiceTest` with a `MutableClock` covering all
+  seven invariants plus a properties-override case (shorter
+  `afkThreshold` demotes to AFK). `PresencePingIT` via Testcontainers
+  exercises ping → bulk-GET → 400-on-blank → config endpoint.
+- **`scripts/docker-smoke.sh`** gained a Phase 4 block: fetch config,
+  ping, bulk-GET asserts the pinger is `online`, blank tabId rejected
+  with 400.
+
+### Verification
+
+- `./gradlew test` — full suite green including `PresenceServiceTest`
+  (8 cases) and `PresencePingIT` (3 cases).
+- Hot-reload dev loop (ng serve + bootRun) — registered `aline` in the
+  browser, created a public room, had `bob4` join via REST. aline's
+  manage-room screen showed aline=**online**, bob4=**offline**. A
+  single `curl -X POST /api/presence/ping` as bob4 flipped bob4 to
+  **online** in aline's tab within ~3 s via the WS fanout topic.
+- `scripts/docker-smoke.sh` — clean rebuild + all phases 0 through 4
+  green (run in the final verification step below).
+
+### Known tradeoffs carried forward
+
+- **No STOMP DISCONNECT hook.** The plan (§3 decision 3) allowed an
+  immediate offline flip on clean tab close via a DISCONNECT handler
+  calling `sessionClosed`. Implemented sweeper-only eviction instead:
+  a closed tab reliably flips to OFFLINE in `afkThreshold +
+  offlineGrace` (~90 s by default), not "within 30 s of the last
+  session activity". The wiring needed to correlate STOMP session id
+  with the HTTP session id keying the presence state added real
+  complexity for a marginal latency improvement at hackathon scale.
+  Revisit if the spec's "presence updates below 2 seconds" (NFR 3.2)
+  is held against the offline edge (it is currently held against
+  online/AFK *transitions* for a live user, which the broker fanout
+  satisfies).
+- **No rate-limit on `/ping`.** The plan left this as an open decision
+  with a 429 default. Skipped for now because the server treats a
+  flood of pings as a no-op after the first per tab-per-interval
+  (no-op since the state is already ONLINE). Add if abuse becomes a
+  real concern.
+- **Snapshot-on-subscribe race.** A transition fired between
+  `GET /api/presence` and the `SUBSCRIBE /topic/presence/{id}` is
+  lost. Mitigation implemented per plan §3 decision 1: the client
+  re-hydrates on `window.focus`.
+- **One `Clock` bean for the whole app.** Pre-existing code used
+  `System.currentTimeMillis()` ad-hoc; Phase 4 introduces the
+  injectable bean only for the presence path. Other modules that
+  would benefit from clock injection (messages, sessions) aren't
+  migrated — out of scope here.
+
+---
+
 ## Next
 
-Phase 4 — presence. Cursor-move / keydown / focus `active` pings
+Phase 5 — contacts, friend requests, user-to-user bans, personal chats.
+Reuses the Phase 4 `/topic/presence/{userId}` topic for contact
+status dots without any new plumbing. Cursor-move / keydown / focus `active` pings
 throttled to 1–2 s; server infers AFK from absence of signals (tabs may
 hibernate, so no "going inactive" message is ever trusted).

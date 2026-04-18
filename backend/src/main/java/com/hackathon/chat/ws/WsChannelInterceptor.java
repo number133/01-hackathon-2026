@@ -21,7 +21,8 @@ import org.springframework.stereotype.Component;
 public class WsChannelInterceptor implements ChannelInterceptor {
 
     private static final Logger log = LoggerFactory.getLogger(WsChannelInterceptor.class);
-    private static final String TOPIC_PREFIX = "/topic/rooms/";
+    private static final String ROOMS_PREFIX = "/topic/rooms/";
+    private static final String PRESENCE_PREFIX = "/topic/presence/";
 
     private final UserService userService;
     private final RoomService roomService;
@@ -52,16 +53,27 @@ public class WsChannelInterceptor implements ChannelInterceptor {
         }
         if (command == StompCommand.SUBSCRIBE) {
             String destination = accessor.getDestination();
-            if (destination == null || !destination.startsWith(TOPIC_PREFIX)) {
-                throw new AccessDeniedException("Only /topic/rooms/{id} subscriptions are allowed");
+            if (destination == null) {
+                throw new AccessDeniedException("Subscribe requires a destination");
             }
-            UUID roomId = parseRoomId(destination.substring(TOPIC_PREFIX.length()));
-            User user = currentUser(accessor);
-            if (banRepository.existsByRoomIdAndUserId(roomId, user.getId())) {
-                throw new AccessDeniedException("Banned from this room");
+            if (destination.startsWith(ROOMS_PREFIX)) {
+                UUID roomId = parseUuidOr403(destination.substring(ROOMS_PREFIX.length()),
+                        "Invalid room destination");
+                User user = currentUser(accessor);
+                if (banRepository.existsByRoomIdAndUserId(roomId, user.getId())) {
+                    throw new AccessDeniedException("Banned from this room");
+                }
+                roomService.requireMember(roomId, user.getId());
+                return message;
             }
-            roomService.requireMember(roomId, user.getId());
-            return message;
+            if (destination.startsWith(PRESENCE_PREFIX)) {
+                // Presence is visible to every authenticated user; the CONNECT
+                // gate above already enforced that. Validate shape only.
+                parseUuidOr403(destination.substring(PRESENCE_PREFIX.length()),
+                        "Invalid presence destination");
+                return message;
+            }
+            throw new AccessDeniedException("Unsupported subscribe destination");
         }
         if (command == StompCommand.SEND) {
             throw new AccessDeniedException("Clients may not send to STOMP destinations");
@@ -76,11 +88,11 @@ public class WsChannelInterceptor implements ChannelInterceptor {
         return userService.requireByUsername(accessor.getUser().getName());
     }
 
-    private static UUID parseRoomId(String raw) {
+    private static UUID parseUuidOr403(String raw, String message) {
         try {
             return UUID.fromString(raw);
         } catch (IllegalArgumentException ex) {
-            throw new AccessDeniedException("Invalid room destination");
+            throw new AccessDeniedException(message);
         }
     }
 }

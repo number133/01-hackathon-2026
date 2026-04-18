@@ -55,6 +55,8 @@ export class ChatService {
   private connected = false;
   private readonly pendingSubscriptions = new Map<string, number>();
   private readonly subscriptions = new Map<string, StompSubscription>();
+  private readonly topicHandlers = new Map<string, Set<(body: unknown) => void>>();
+  private readonly topicSubs = new Map<string, StompSubscription>();
 
   state(roomId: string): RoomState {
     return this.rooms()[roomId] ?? EMPTY_STATE;
@@ -72,18 +74,24 @@ export class ChatService {
         for (const roomId of this.pendingSubscriptions.keys()) {
           this.wireSubscription(roomId);
         }
+        for (const destination of this.topicHandlers.keys()) {
+          this.wireTopic(destination);
+        }
       },
       onDisconnect: () => {
         this.connected = false;
         this.subscriptions.clear();
+        this.topicSubs.clear();
       },
       onStompError: () => {
         this.connected = false;
         this.subscriptions.clear();
+        this.topicSubs.clear();
       },
       onWebSocketClose: () => {
         this.connected = false;
         this.subscriptions.clear();
+        this.topicSubs.clear();
       },
     });
     this.client.activate();
@@ -179,6 +187,46 @@ export class ChatService {
 
   delete(messageId: string): Observable<void> {
     return this.http.delete<void>(`/api/messages/${messageId}`);
+  }
+
+  subscribeTopic(destination: string, handler: (body: unknown) => void): () => void {
+    let set = this.topicHandlers.get(destination);
+    if (!set) {
+      set = new Set();
+      this.topicHandlers.set(destination, set);
+    }
+    set.add(handler);
+    this.wireTopic(destination);
+    return () => this.unsubscribeTopic(destination, handler);
+  }
+
+  private unsubscribeTopic(destination: string, handler: (body: unknown) => void): void {
+    const set = this.topicHandlers.get(destination);
+    if (!set) return;
+    set.delete(handler);
+    if (set.size === 0) {
+      this.topicHandlers.delete(destination);
+      const sub = this.topicSubs.get(destination);
+      if (sub) {
+        sub.unsubscribe();
+        this.topicSubs.delete(destination);
+      }
+    }
+  }
+
+  private wireTopic(destination: string): void {
+    if (!this.client || !this.connected) return;
+    if (this.topicSubs.has(destination)) return;
+    const sub = this.client.subscribe(destination, (frame: IMessage) => {
+      try {
+        const body = JSON.parse(frame.body);
+        const handlers = this.topicHandlers.get(destination);
+        handlers?.forEach((h) => h(body));
+      } catch {
+        // ignore malformed frames
+      }
+    });
+    this.topicSubs.set(destination, sub);
   }
 
   private wireSubscription(roomId: string): void {

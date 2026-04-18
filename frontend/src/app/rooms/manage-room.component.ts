@@ -1,9 +1,11 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { AuthService } from '../auth/auth.service';
+import { PresenceDotComponent } from '../presence/presence-dot.component';
+import { PresenceService } from '../presence/presence.service';
 import { InvitationService, InvitationView } from './invitation.service';
 import {
   RoomBanView,
@@ -18,16 +20,19 @@ type Tab = 'members' | 'admins' | 'banned' | 'invitations' | 'settings';
 @Component({
   selector: 'app-manage-room',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink, PresenceDotComponent],
   templateUrl: './manage-room.component.html',
 })
-export class ManageRoomComponent implements OnInit {
+export class ManageRoomComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly rooms = inject(RoomService);
   private readonly invitations = inject(InvitationService);
   private readonly auth = inject(AuthService);
+  private readonly presence = inject(PresenceService);
   private readonly fb = inject(FormBuilder);
+
+  private watchedIds: string[] = [];
 
   readonly tab = signal<Tab>('members');
   readonly room = signal<RoomView | null>(null);
@@ -85,9 +90,27 @@ export class ManageRoomComponent implements OnInit {
 
   private loadMembers(id: string): void {
     this.rooms.listMembers(id).subscribe({
-      next: (m) => this.members.set(m),
+      next: (m) => {
+        this.members.set(m);
+        this.rewatchPresence(m.map((x) => x.userId));
+      },
       error: (err: unknown) => this.error.set(this.auth.errorText(err)),
     });
+  }
+
+  private rewatchPresence(ids: string[]): void {
+    if (this.watchedIds.length > 0) {
+      this.presence.unwatch(this.watchedIds);
+    }
+    this.presence.watch(ids);
+    this.watchedIds = ids;
+  }
+
+  ngOnDestroy(): void {
+    if (this.watchedIds.length > 0) {
+      this.presence.unwatch(this.watchedIds);
+      this.watchedIds = [];
+    }
   }
 
   private loadBans(id: string): void {
@@ -121,6 +144,10 @@ export class ManageRoomComponent implements OnInit {
       next: () => this.loadMembers(id),
       error: (err: unknown) => this.error.set(this.auth.errorText(err)),
     });
+  }
+
+  presenceStatus(userId: string): string {
+    return this.presence.status(userId);
   }
 
   remove(userId: string, username: string): void {

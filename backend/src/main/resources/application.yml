@@ -32,6 +32,11 @@ chat:
   session:
     short-ttl: 24h
     long-ttl: 30d
+  presence:
+    ping-interval: 2s
+    afk-threshold: 60s
+    offline-grace: 30s
+    sweep-interval: 5s
 
 management:
   endpoints:
