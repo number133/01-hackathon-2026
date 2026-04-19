@@ -7,6 +7,7 @@ import { AuthService } from '../auth/auth.service';
 import { ComposerComponent } from '../chat/composer.component';
 import { MessageListComponent } from '../chat/message-list.component';
 import { NotificationService } from '../core/notification/notification.service';
+import { AvatarComponent } from '../layout/avatar.component';
 import { ChatSidebarComponent } from '../layout/chat-sidebar.component';
 import { ManageRoomComponent } from './manage-room.component';
 import { RoomContextPaneComponent } from './room-context-pane.component';
@@ -22,6 +23,7 @@ import { RoomMemberView, RoomService, RoomView } from './room.service';
     ManageRoomComponent,
     ChatSidebarComponent,
     RoomContextPaneComponent,
+    AvatarComponent,
   ],
   templateUrl: './room-view.component.html',
 })

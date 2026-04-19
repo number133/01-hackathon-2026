@@ -12,16 +12,21 @@ import { Component, Input } from '@angular/core';
     `
       .unread-badge {
         display: inline-block;
-        min-width: 1.1rem;
-        padding: 0.05rem 0.4rem;
+        min-width: 1.2rem;
+        padding: 0.1rem 0.5rem;
         margin-left: 0.4rem;
-        background: #d93025;
+        background: linear-gradient(135deg, #EA2143 0%, #FF6A85 100%);
         color: #fff;
-        font-size: 0.75rem;
-        font-weight: 600;
+        font-size: 0.72rem;
+        font-weight: 800;
         border-radius: 999px;
         text-align: center;
-        line-height: 1.1rem;
+        line-height: 1.15rem;
+        letter-spacing: 0.02em;
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        box-shadow:
+          0 4px 10px rgba(234, 33, 67, 0.35),
+          inset 0 1px 0 rgba(255, 255, 255, 0.3);
       }
     `,
   ],

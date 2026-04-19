@@ -24,13 +24,25 @@ import { PresenceService, PresenceStatus } from './presence.service';
         width: 0.6rem;
         height: 0.6rem;
         border-radius: 50%;
-        background: var(--presence-offline, #9aa0a6);
+        background: #9AA0B4;
         margin-right: 0.35rem;
         vertical-align: middle;
+        box-shadow:
+          0 0 0 2px rgba(255, 255, 255, 0.9),
+          0 2px 6px rgba(10, 14, 40, 0.25);
       }
-      .presence-dot.online { background: var(--presence-online, #34a853); }
-      .presence-dot.afk    { background: var(--presence-afk, #f9ab00); }
-      .presence-dot.offline { background: var(--presence-offline, #9aa0a6); }
+      .presence-dot.online {
+        background: radial-gradient(circle at 35% 30%, #5FE6A4, #07CA6B 80%);
+        box-shadow:
+          0 0 0 2px rgba(255, 255, 255, 0.9),
+          0 0 10px rgba(7, 202, 107, 0.55);
+      }
+      .presence-dot.afk {
+        background: radial-gradient(circle at 35% 30%, #FFC59A, #E89558 80%);
+      }
+      .presence-dot.offline {
+        background: radial-gradient(circle at 35% 30%, #C8CCDC, #9AA0B4 80%);
+      }
     `,
   ],
 })

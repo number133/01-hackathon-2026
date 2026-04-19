@@ -63,13 +63,15 @@
 
     <section *ngIf="tab() === 'admins'">
       <p class="muted">Only the owner can promote. Any admin can demote other admins (but not the owner).</p>
-      <ul>
-        <li *ngFor="let m of members()" [class.muted]="m.role === 'member'">
-          <ng-container *ngIf="m.role !== 'member'">
-            {{ m.username }} — {{ m.role }}
+      <ul class="member-list">
+        <ng-container *ngFor="let m of members()">
+          <li *ngIf="m.role !== 'member'">
+            <app-presence-dot [userId]="m.userId"></app-presence-dot>
+            <span class="grow">{{ m.username }}</span>
+            <span class="badge">{{ m.role }}</span>
             <button *ngIf="m.role === 'admin' && isAdminOrOwner()" type="button" class="small" (click)="demote(m.userId)">Demote</button>
-          </ng-container>
-        </li>
+          </li>
+        </ng-container>
       </ul>
     </section>
 
@@ -137,11 +139,11 @@
         </div>
       </form>
 
-      <div *ngIf="confirmingDelete()" class="confirm-row" style="margin-top: 12px; padding: 12px; background: #1e2d40; border-radius: 8px;">
-        Delete this room permanently? All messages and files will be removed and cannot be recovered.
-        <div class="row gap" style="margin-top: 8px;">
+      <div *ngIf="confirmingDelete()" class="confirm-block">
+        <p class="message">Delete this room permanently? All messages and files will be removed and cannot be recovered.</p>
+        <div class="row gap">
           <button type="button" class="danger" (click)="confirmDeleteRoom()">Yes, delete it</button>
-          <button type="button" (click)="cancelDeleteRoom()">Cancel</button>
+          <button type="button" class="small" (click)="cancelDeleteRoom()">Cancel</button>
         </div>
       </div>
     </section>

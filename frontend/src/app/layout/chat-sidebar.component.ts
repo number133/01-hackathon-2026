@@ -12,6 +12,7 @@ import { PresenceService } from '../presence/presence.service';
 import { RoomService, RoomView } from '../rooms/room.service';
 import { UnreadBadgeComponent } from '../unread/unread-badge.component';
 import { UnreadService } from '../unread/unread.service';
+import { AvatarComponent } from './avatar.component';
 
 @Component({
   selector: 'app-chat-sidebar',
@@ -23,6 +24,7 @@ import { UnreadService } from '../unread/unread.service';
     RouterLinkActive,
     PresenceDotComponent,
     UnreadBadgeComponent,
+    AvatarComponent,
   ],
   templateUrl: './chat-sidebar.component.html',
 })

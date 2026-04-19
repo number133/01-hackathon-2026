@@ -16,6 +16,7 @@ import { AuthService } from '../auth/auth.service';
 import { ChatService, MessageView } from '../chat/chat.service';
 import { EmojiPickerButtonComponent } from '../chat/emoji-picker-button.component';
 import { MessageItemComponent } from '../chat/message-item.component';
+import { AvatarComponent } from '../layout/avatar.component';
 import { ChatSidebarComponent } from '../layout/chat-sidebar.component';
 import { PresenceDotComponent } from '../presence/presence-dot.component';
 import { PresenceService } from '../presence/presence.service';
@@ -33,6 +34,7 @@ import { DialogService, DialogView } from './dialog.service';
     ChatSidebarComponent,
     MessageItemComponent,
     EmojiPickerButtonComponent,
+    AvatarComponent,
   ],
   templateUrl: './dialog-view.component.html',
 })

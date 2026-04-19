@@ -4,6 +4,7 @@
   <app-message-item
     *ngFor="let m of messages(); trackBy: trackByMessage"
     [message]="m"
+    [mine]="m.authorId === myUserId"
     [canEdit]="canEdit(m)"
     [canDelete]="canDelete(m)"
     (reply)="onReply($event)">

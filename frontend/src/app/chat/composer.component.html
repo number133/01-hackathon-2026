@@ -4,29 +4,32 @@
     <button type="button" class="link small" (click)="clearReply.emit()">×</button>
   </div>
 
-  <textarea
-    [formControl]="text"
-    rows="2"
-    maxlength="3072"
-    placeholder="Type a message. Enter to send, Shift+Enter for newline."
-    (keydown)="handleKeydown($event)"
-    (paste)="handlePaste($event)">
-  </textarea>
+  <div class="composer-bar">
+    <app-attachment-picker
+      class="composer-icon"
+      [conversationId]="conversationId"
+      (idsChange)="onAttachmentsChange($event)">
+    </app-attachment-picker>
 
-  <app-attachment-picker
-    [conversationId]="conversationId"
-    (idsChange)="onAttachmentsChange($event)">
-  </app-attachment-picker>
+    <textarea
+      [formControl]="text"
+      rows="1"
+      maxlength="3072"
+      placeholder="Type a message. Enter to send, Shift+Enter for newline."
+      (keydown)="handleKeydown($event)"
+      (paste)="handlePaste($event)">
+    </textarea>
+
+    <app-emoji-picker-button
+      class="composer-icon"
+      (emojiSelected)="insertEmoji($event)">
+    </app-emoji-picker-button>
+
+    <button type="button" class="send-btn" (click)="submit()" [disabled]="!canSend()">
+      {{ submitting() ? '…' : 'Send' }}
+    </button>
+  </div>
 
   <div *ngIf="error() as msg" class="error small">{{ msg }}</div>
-
-  <div class="row between">
-    <span class="muted small">{{ text.value.length }}/3072</span>
-    <div class="row" style="gap: 8px; align-items: center;">
-      <app-emoji-picker-button (emojiSelected)="insertEmoji($event)"></app-emoji-picker-button>
-      <button type="button" (click)="submit()" [disabled]="!canSend()">
-        {{ submitting() ? 'Sending…' : 'Send' }}
-      </button>
-    </div>
-  </div>
+  <div class="composer-counter muted small">{{ text.value.length }}/3072</div>
 </section>

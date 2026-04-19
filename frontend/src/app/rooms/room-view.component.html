@@ -7,10 +7,11 @@
     <ng-container *ngIf="room() as r">
       <header class="chat-header">
         <div>
-          <h1># {{ r.name }}
-            <span class="badge">{{ r.visibility }}</span>
-          </h1>
-          <p class="muted">{{ r.description || 'No description.' }}</p>
+          <app-avatar [name]="r.name"></app-avatar>
+          <div>
+            <h1>{{ r.name }} <span class="badge">{{ r.visibility }}</span></h1>
+            <p class="muted">{{ r.description || 'No description.' }}</p>
+          </div>
         </div>
         <div class="row gap">
           <button *ngIf="!r.myRole && r.visibility === 'public'" type="button" (click)="join()">Join</button>

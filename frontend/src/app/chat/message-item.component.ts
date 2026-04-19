@@ -1,22 +1,27 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, Output, inject, signal } from '@angular/core';
+import { Component, EventEmitter, HostBinding, Input, Output, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 
 import { AttachmentViewComponent } from '../attachment/attachment-view.component';
 import { AuthService } from '../auth/auth.service';
+import { AvatarComponent } from '../layout/avatar.component';
 import { ChatService, MessageView } from './chat.service';
 
 @Component({
   selector: 'app-message-item',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, AttachmentViewComponent],
+  imports: [CommonModule, ReactiveFormsModule, AttachmentViewComponent, AvatarComponent],
   templateUrl: './message-item.component.html',
 })
 export class MessageItemComponent {
   @Input({ required: true }) message!: MessageView;
   @Input() canEdit = false;
   @Input() canDelete = false;
+  @Input() mine = false;
   @Output() reply = new EventEmitter<MessageView>();
+
+  @HostBinding('class.mine') get hostMine() { return this.mine; }
+  @HostBinding('class.theirs') get hostTheirs() { return !this.mine; }
 
   private readonly chat = inject(ChatService);
   private readonly auth = inject(AuthService);

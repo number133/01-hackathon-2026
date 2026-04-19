@@ -28,18 +28,38 @@ import { AttachmentRef, AttachmentService } from './attachment.service';
         max-width: 320px;
         max-height: 240px;
         display: block;
-        border-radius: 4px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.45);
+        box-shadow:
+          0 8px 22px rgba(10, 14, 40, 0.16),
+          inset 0 1px 0 rgba(255, 255, 255, 0.4);
       }
-      .att-image figcaption { font-size: 0.85em; color: #666; margin-top: 0.25rem; }
+      .att-image figcaption {
+        font-size: 0.85em;
+        color: rgba(20, 20, 20, 0.62);
+        margin-top: 0.35rem;
+        font-weight: 500;
+      }
       .att-card {
         display: inline-block;
-        padding: 0.5rem 0.75rem;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        background: #f6f6f6;
+        padding: 0.65rem 0.9rem;
+        border: 1px solid rgba(255, 255, 255, 0.55);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.62);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        box-shadow:
+          0 4px 14px rgba(10, 14, 40, 0.1),
+          inset 0 1px 0 rgba(255, 255, 255, 0.5);
       }
-      .att-card a { display: flex; flex-direction: column; text-decoration: none; color: #222; }
-      .att-card small { color: #666; font-size: 0.8em; }
+      .att-card a {
+        display: flex;
+        flex-direction: column;
+        text-decoration: none;
+        color: #141414;
+        font-weight: 600;
+      }
+      .att-card small { color: rgba(20, 20, 20, 0.62); font-size: 0.8em; font-weight: 500; }
     `,
   ],
 })

@@ -45,13 +45,52 @@ interface PendingAttachment {
   `,
   styles: [
     `
-      .picker { display: flex; flex-direction: column; gap: 0.25rem; }
-      .attach-btn { cursor: pointer; font-size: 1.25rem; padding: 0.2rem 0.4rem; }
+      .picker { display: flex; flex-direction: column; gap: 0.35rem; }
+      .attach-btn {
+        cursor: pointer;
+        font-size: 1.2rem;
+        padding: 0.35rem 0.55rem;
+        border-radius: 999px;
+        color: rgba(20, 20, 20, 0.62);
+        transition: background 140ms ease, color 140ms ease;
+      }
+      .attach-btn:hover {
+        background: rgba(255, 255, 255, 0.45);
+        color: #141414;
+      }
       .attach-btn input { display: none; }
-      .chips { display: flex; flex-direction: column; gap: 0.25rem; }
-      .chip { display: flex; gap: 0.5rem; align-items: center; padding: 0.2rem 0.4rem; background: #f4f4f4; border-radius: 4px; }
-      .chip.error { background: #fdd; }
-      .error-text { color: #b00; font-size: 0.85em; }
+      .chips { display: flex; flex-direction: column; gap: 0.35rem; }
+      .chip {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        padding: 0.4rem 0.65rem;
+        background: rgba(255, 255, 255, 0.62);
+        border: 1px solid rgba(255, 255, 255, 0.55);
+        border-radius: 12px;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        box-shadow: 0 2px 8px rgba(10, 14, 40, 0.06);
+      }
+      .chip.error {
+        background: rgba(234, 33, 67, 0.1);
+        border-color: rgba(234, 33, 67, 0.35);
+      }
+      .chip .name { font-weight: 600; }
+      .chip input[type='text'] {
+        background: rgba(255, 255, 255, 0.85);
+        border: 1px solid rgba(20, 20, 20, 0.08);
+        border-radius: 8px;
+        padding: 4px 8px;
+        font-size: 0.85rem;
+        outline: none;
+        font-family: inherit;
+      }
+      .chip input[type='text']:focus {
+        border-color: #1856FF;
+        box-shadow: 0 0 0 3px rgba(24, 86, 255, 0.15);
+      }
+      .error-text { color: #EA2143; font-size: 0.85em; font-weight: 600; }
     `,
   ],
 })

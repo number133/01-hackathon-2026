@@ -4,13 +4,16 @@
   <section class="chat-main">
     <header class="chat-header">
       <div>
-        <h1>
-          <app-presence-dot [userId]="d.counterpartId"></app-presence-dot>
-          {{ d.counterpartUsername }}
-        </h1>
-        <p *ngIf="d.frozen" class="muted">
-          Frozen — you can read history but cannot send. Re-friend or unblock to continue.
-        </p>
+        <div class="avatar-wrap">
+          <app-avatar [name]="d.counterpartUsername"></app-avatar>
+          <app-presence-dot class="dot-overlay" [userId]="d.counterpartId"></app-presence-dot>
+        </div>
+        <div>
+          <h1>{{ d.counterpartUsername }}</h1>
+          <p *ngIf="d.frozen" class="muted">
+            Frozen — you can read history but cannot send. Re-friend or unblock to continue.
+          </p>
+        </div>
       </div>
     </header>
 
@@ -21,6 +24,7 @@
       <app-message-item
         *ngFor="let m of messages(); trackBy: trackByMessage"
         [message]="m"
+        [mine]="m.authorId === myUserId()"
         [canEdit]="canEdit(m)"
         [canDelete]="canDelete(m)"
         (reply)="onReply($event)">
@@ -36,26 +40,31 @@
         <button type="button" class="link small" (click)="clearReply()">×</button>
       </div>
 
-      <textarea
-        [formControl]="text"
-        (keydown)="handleKeydown($event)"
-        (paste)="handlePaste($event)"
-        rows="2"
-        maxlength="3072"
-        placeholder="Type a message. Enter to send, Shift+Enter for newline."
-      ></textarea>
-      <app-attachment-picker
-        [conversationId]="d.id"
-        (idsChange)="onAttachmentsChange($event)">
-      </app-attachment-picker>
+      <div class="composer-bar">
+        <app-attachment-picker
+          class="composer-icon"
+          [conversationId]="d.id"
+          (idsChange)="onAttachmentsChange($event)">
+        </app-attachment-picker>
 
-      <div class="row between">
-        <span class="muted small">{{ text.value.length }}/3072</span>
-        <div class="row" style="gap: 8px; align-items: center;">
-          <app-emoji-picker-button (emojiSelected)="insertEmoji($event)"></app-emoji-picker-button>
-          <button type="button" (click)="send()" [disabled]="!canSend()">Send</button>
-        </div>
+        <textarea
+          [formControl]="text"
+          (keydown)="handleKeydown($event)"
+          (paste)="handlePaste($event)"
+          rows="1"
+          maxlength="3072"
+          placeholder="Type a message. Enter to send, Shift+Enter for newline."
+        ></textarea>
+
+        <app-emoji-picker-button
+          class="composer-icon"
+          (emojiSelected)="insertEmoji($event)">
+        </app-emoji-picker-button>
+
+        <button type="button" class="send-btn" (click)="send()" [disabled]="!canSend()">Send</button>
       </div>
+
+      <div class="composer-counter muted small">{{ text.value.length }}/3072</div>
     </section>
   </section>
 
