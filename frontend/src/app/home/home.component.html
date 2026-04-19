@@ -9,22 +9,6 @@
     <a routerLink="/register">Create an account</a> or
     <a routerLink="/login">sign in</a> to start chatting.
   </p>
-
-  <h2>Backend health</h2>
-  <ng-container *ngIf="state() as s">
-    <p *ngIf="s.loading">Checking…</p>
-    <div *ngIf="s.error" class="error">Health check failed: {{ s.error }}</div>
-    <dl *ngIf="s.data" class="kv">
-      <dt>status</dt>
-      <dd [class.ok]="s.data.status === 'ok'" [class.bad]="s.data.status !== 'ok'">
-        {{ s.data.status }}
-      </dd>
-      <dt>db</dt>
-      <dd [class.ok]="s.data.db === 'ok'" [class.bad]="s.data.db !== 'ok'">{{ s.data.db }}</dd>
-      <dt>flywayVersion</dt>
-      <dd>{{ s.data.flywayVersion ?? '(none)' }}</dd>
-    </dl>
-  </ng-container>
 </section>
 
 <section class="wide-card" *ngIf="!user() && demo().length > 0">
