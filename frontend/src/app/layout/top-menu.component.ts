@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, effect, inject } from '@angular/core';
+import { Component, HostListener, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 
 import { AuthService } from '../auth/auth.service';
@@ -24,6 +24,10 @@ export class TopMenuComponent implements OnInit {
   readonly pendingInvites = this.invitations.pendingCount;
   readonly pendingFriendRequests = this.friends.incomingPendingCount;
   readonly totalUnread = this.unread.total;
+  readonly profileNotifications = computed(
+    () => this.pendingInvites() + this.pendingFriendRequests(),
+  );
+  readonly profileOpen = signal(false);
 
   constructor() {
     effect(() => {
@@ -39,7 +43,24 @@ export class TopMenuComponent implements OnInit {
     }
   }
 
+  toggleProfile(): void {
+    this.profileOpen.update((v) => !v);
+  }
+
+  closeProfile(): void {
+    this.profileOpen.set(false);
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(ev: MouseEvent): void {
+    const target = ev.target as HTMLElement;
+    if (!target.closest('.profile-menu')) {
+      this.profileOpen.set(false);
+    }
+  }
+
   logout(): void {
+    this.profileOpen.set(false);
     this.auth.logout().subscribe({
       next: () => this.router.navigateByUrl('/'),
       error: () => this.router.navigateByUrl('/'),

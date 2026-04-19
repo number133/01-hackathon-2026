@@ -55,6 +55,10 @@ export class RoomService {
     return this.http.get<RoomView[]>(`/api/rooms${qs}`);
   }
 
+  listMine(): Observable<RoomView[]> {
+    return this.http.get<RoomView[]>('/api/rooms/mine');
+  }
+
   get(id: string): Observable<RoomView> {
     return this.http.get<RoomView>(`/api/rooms/${id}`);
   }

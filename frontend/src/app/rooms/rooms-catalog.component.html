@@ -1,12 +1,13 @@
 <section class="wide-card">
   <div class="row between">
-    <h1>Public rooms</h1>
+    <h1>{{ heading() }}</h1>
     <a routerLink="/rooms/new">
       <button type="button">Create room</button>
     </a>
   </div>
 
-  <input type="text" [formControl]="search" placeholder="Search rooms…" class="search" />
+  <input *ngIf="mode === 'public'"
+         type="text" [formControl]="search" placeholder="Search rooms…" class="search" />
 
   <div *ngIf="loading()" class="muted">Loading…</div>
   <div *ngIf="error() as msg" class="error">{{ msg }}</div>
@@ -22,14 +23,20 @@
         </div>
         <div>
           <span *ngIf="room.myRole" class="badge">{{ room.myRole }}</span>
-          <button *ngIf="!room.myRole" type="button" (click)="join(room)">Join</button>
+          <button *ngIf="!room.myRole && mode === 'public'" type="button" (click)="join(room)">Join</button>
         </div>
       </div>
     </li>
   </ul>
 
   <div *ngIf="!loading() && rooms().length === 0" class="empty-state">
-    <p>No public rooms yet.</p>
-    <a routerLink="/rooms/new">Create the first one</a>.
+    <p>{{ emptyTitle() }}</p>
+    <ng-container *ngIf="mode === 'public'">
+      <a routerLink="/rooms/new">Create the first one</a>.
+    </ng-container>
+    <ng-container *ngIf="mode === 'private'">
+      Create a private room or accept an
+      <a routerLink="/invitations">invitation</a>.
+    </ng-container>
   </div>
 </section>

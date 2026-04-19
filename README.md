@@ -11,9 +11,10 @@ Built for a hackathon. Grading requires `docker compose up` to work out of the b
 
 - **Backend:** Java 21, Spring Boot 3.3, Gradle (Kotlin DSL), PostgreSQL 16,
   Flyway, JUnit 5 + Mockito. Session-based auth (no JWT).
-- **Frontend:** Angular 17 (standalone components), strict TypeScript, STOMP
-  WebSocket client (added in a later phase).
-- **Transport:** HTTP for request/response, STOMP-over-WebSocket for live events.
+- **Frontend:** Angular 17 (standalone components), strict TypeScript,
+  STOMP-over-WebSocket client, `@ctrl/ngx-emoji-mart` emoji picker.
+- **Transport:** HTTP for request/response and message sends, STOMP-over-
+  WebSocket for message/presence/unread fan-out and per-user notifications.
 - **Packaging:** multi-stage Dockerfile. The Angular production build is baked
   into the Spring Boot jar as static resources, so one container serves everything.
 
@@ -27,11 +28,25 @@ docker compose up --build
 
 Then open [http://localhost:8080/](http://localhost:8080/).
 
+The landing page shows a **Demo accounts** panel with three pre-seeded
+users (`alice`, `bob`, `carol`) sharing the password `DemoPass123!`.
+Copy buttons are provided on each row. The seed also populates a public
+room with a short conversation, a private room with a pending
+invitation, and a one-to-one dialog — so clicking around exercises the
+full feature set immediately after the first boot.
+
+The seed is gated by `CHAT_DEMO_SEED_ENABLED=true`, which
+`docker-compose.yml` sets automatically. A deployment that omits that
+env var boots with an empty database, and `GET /api/dev/demo-accounts`
+returns 404.
+
 Useful endpoints:
 
 - `GET /api/health` — reports `status`, `db`, and `flywayVersion`. Shows
   `status: degraded` and `db: down` if PostgreSQL is unreachable rather than
   hanging.
+- `GET /api/dev/demo-accounts` — dev-only; returns the seeded credentials
+  the landing page renders. 404 when the demo seed is disabled.
 
 Stop the stack:
 
@@ -47,7 +62,8 @@ backend/    Spring Boot service. Gradle Kotlin DSL. Flyway migrations under
             src/main/resources/db/migration.
 frontend/   Angular application. Built as static assets and copied into the
             backend jar by the Docker build.
-shared/     Placeholder for code shared between the two (empty in Phase 0).
+shared/     Placeholder for code shared between the two (unused to date).
+scripts/    docker-smoke.sh — end-to-end probe run once per phase.
 howto/      Plans and guidance notes (globally git-ignored on this machine).
 ```
 

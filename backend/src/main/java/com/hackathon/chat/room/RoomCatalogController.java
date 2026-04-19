@@ -28,4 +28,11 @@ public class RoomCatalogController {
                 SecurityContextHolder.getContext().getAuthentication().getName());
         return roomService.listPublicCatalog(q, limit, me.getId());
     }
+
+    @GetMapping("/mine")
+    public List<RoomView> mine() {
+        User me = userService.requireByUsername(
+                SecurityContextHolder.getContext().getAuthentication().getName());
+        return roomService.listMine(me.getId());
+    }
 }

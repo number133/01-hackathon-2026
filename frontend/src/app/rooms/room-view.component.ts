@@ -6,13 +6,22 @@ import { AuthService } from '../auth/auth.service';
 import { ComposerComponent } from '../chat/composer.component';
 import { MessageListComponent } from '../chat/message-list.component';
 import { NotificationService } from '../core/notification/notification.service';
+import { ChatSidebarComponent } from '../layout/chat-sidebar.component';
 import { ManageRoomComponent } from './manage-room.component';
+import { RoomContextPaneComponent } from './room-context-pane.component';
 import { RoomMemberView, RoomService, RoomView } from './room.service';
 
 @Component({
   selector: 'app-room-view',
   standalone: true,
-  imports: [CommonModule, MessageListComponent, ComposerComponent, ManageRoomComponent],
+  imports: [
+    CommonModule,
+    MessageListComponent,
+    ComposerComponent,
+    ManageRoomComponent,
+    ChatSidebarComponent,
+    RoomContextPaneComponent,
+  ],
   templateUrl: './room-view.component.html',
 })
 export class RoomViewComponent implements OnInit {

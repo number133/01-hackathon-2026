@@ -7,6 +7,7 @@ import { AttachmentPickerComponent } from '../attachment/attachment-picker.compo
 import { AttachmentViewComponent } from '../attachment/attachment-view.component';
 import { AuthService } from '../auth/auth.service';
 import { ChatService } from '../chat/chat.service';
+import { ChatSidebarComponent } from '../layout/chat-sidebar.component';
 import { PresenceDotComponent } from '../presence/presence-dot.component';
 import { PresenceService } from '../presence/presence.service';
 import { UnreadService } from '../unread/unread.service';
@@ -21,6 +22,7 @@ import { DialogService, DialogView } from './dialog.service';
     PresenceDotComponent,
     AttachmentPickerComponent,
     AttachmentViewComponent,
+    ChatSidebarComponent,
   ],
   templateUrl: './dialog-view.component.html',
 })

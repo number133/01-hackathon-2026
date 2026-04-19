@@ -1,0 +1,64 @@
+<aside class="chat-sidebar">
+  <input type="text" [formControl]="search" placeholder="Search…" class="search" />
+
+  <details open class="sidebar-section">
+    <summary>Public Rooms</summary>
+    <ul class="sidebar-list">
+      <li *ngFor="let r of publicRooms()">
+        <a [routerLink]="['/rooms', r.id]" routerLinkActive="active">
+          <span class="label"># {{ r.name }}</span>
+          <app-unread-badge [count]="unread.countFor(r.conversationId)"></app-unread-badge>
+        </a>
+      </li>
+      <li *ngIf="publicRooms().length === 0" class="muted small">
+        <a routerLink="/rooms">Browse catalog</a>
+      </li>
+    </ul>
+  </details>
+
+  <details open class="sidebar-section">
+    <summary>Private Rooms</summary>
+    <ul class="sidebar-list">
+      <li *ngFor="let r of privateRooms()">
+        <a [routerLink]="['/rooms', r.id]" routerLinkActive="active">
+          <span class="label">🔒 {{ r.name }}</span>
+          <app-unread-badge [count]="unread.countFor(r.conversationId)"></app-unread-badge>
+        </a>
+      </li>
+      <li *ngIf="privateRooms().length === 0" class="muted small">
+        No private rooms.
+      </li>
+    </ul>
+  </details>
+
+  <details open class="sidebar-section">
+    <summary>Contacts</summary>
+    <ul class="sidebar-list">
+      <li *ngFor="let f of contacts()">
+        <a *ngIf="dialogIdFor(f.userId) as dlgId; else openCta"
+           [routerLink]="['/dialogs', dlgId]" routerLinkActive="active">
+          <span class="label">
+            <app-presence-dot [userId]="f.userId"></app-presence-dot>
+            {{ f.username }}
+          </span>
+          <app-unread-badge [count]="unread.countFor(dlgId)"></app-unread-badge>
+        </a>
+        <ng-template #openCta>
+          <button type="button" class="link contact-open" (click)="openContact(f.userId)">
+            <span class="label">
+              <app-presence-dot [userId]="f.userId"></app-presence-dot>
+              {{ f.username }}
+            </span>
+          </button>
+        </ng-template>
+      </li>
+      <li *ngIf="contacts().length === 0" class="muted small">
+        <a routerLink="/contacts">Add a contact</a>
+      </li>
+    </ul>
+  </details>
+
+  <div class="sidebar-actions">
+    <a routerLink="/rooms/new"><button type="button">Create room</button></a>
+  </div>
+</aside>

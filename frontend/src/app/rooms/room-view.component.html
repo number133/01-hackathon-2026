@@ -1,58 +1,55 @@
-<section class="wide-card" *ngIf="!loading(); else loadingTpl">
-  <div *ngIf="error() as msg" class="error">{{ msg }}</div>
+<div class="chat-shell" *ngIf="!loading(); else loadingTpl">
+  <app-chat-sidebar></app-chat-sidebar>
 
-  <ng-container *ngIf="room() as r">
-    <div class="row between">
-      <div>
-        <h1># {{ r.name }}
-          <span class="badge">{{ r.visibility }}</span>
-        </h1>
-        <p class="muted">{{ r.description || 'No description.' }}</p>
-        <p class="muted">Owner: {{ r.ownerUsername }} · {{ r.memberCount }} member{{ r.memberCount === 1 ? '' : 's' }}</p>
-      </div>
-      <div>
-        <button *ngIf="r.myRole === 'owner' || r.myRole === 'admin'"
-                type="button"
-                (click)="manageOpen.set(true)">Manage room</button>
-        <button *ngIf="!r.myRole && r.visibility === 'public'" type="button" (click)="join()">Join</button>
-        <button *ngIf="r.myRole && r.myRole !== 'owner'" type="button" (click)="leave()">Leave</button>
-      </div>
-    </div>
+  <section class="chat-main">
+    <div *ngIf="error() as msg" class="error">{{ msg }}</div>
 
-    <hr />
+    <ng-container *ngIf="room() as r">
+      <header class="chat-header">
+        <div>
+          <h1># {{ r.name }}
+            <span class="badge">{{ r.visibility }}</span>
+          </h1>
+          <p class="muted">{{ r.description || 'No description.' }}</p>
+        </div>
+        <div class="row gap">
+          <button *ngIf="!r.myRole && r.visibility === 'public'" type="button" (click)="join()">Join</button>
+          <button *ngIf="r.myRole && r.myRole !== 'owner'" type="button" (click)="leave()">Leave</button>
+        </div>
+      </header>
 
-    <div *ngIf="r.myRole; else notMember" class="chat-pane">
-      <details>
-        <summary>Members ({{ members().length }})</summary>
-        <ul class="member-list">
-          <li *ngFor="let m of members()">
-            {{ m.username }}
-            <span class="badge" *ngIf="m.role !== 'member'">{{ m.role }}</span>
-          </li>
-        </ul>
-      </details>
+      <ng-container *ngIf="r.myRole; else notMember">
+        <app-message-list
+          #list
+          [roomId]="r.id"
+          [conversationId]="r.conversationId"
+          [myUserId]="myUserId()"
+          [myRole]="r.myRole">
+        </app-message-list>
 
-      <app-message-list
-        #list
-        [roomId]="r.id"
-        [conversationId]="r.conversationId"
-        [myUserId]="myUserId()"
-        [myRole]="r.myRole">
-      </app-message-list>
+        <app-composer
+          [roomId]="r.id"
+          [conversationId]="r.conversationId"
+          [replyingTo]="list.replyingTo()"
+          (clearReply)="list.clearReply()">
+        </app-composer>
+      </ng-container>
 
-      <app-composer
-        [roomId]="r.id"
-        [conversationId]="r.conversationId"
-        [replyingTo]="list.replyingTo()"
-        (clearReply)="list.clearReply()">
-      </app-composer>
-    </div>
+      <ng-template #notMember>
+        <div class="empty-state">
+          Join the room to see members and messages.
+        </div>
+      </ng-template>
+    </ng-container>
+  </section>
 
-    <ng-template #notMember>
-      <p class="muted">Join the room to see its members and (soon) its messages.</p>
-    </ng-template>
-  </ng-container>
-</section>
+  <app-room-context-pane
+    *ngIf="room() as r"
+    [room]="r"
+    [members]="members()"
+    (manageRequested)="manageOpen.set(true)">
+  </app-room-context-pane>
+</div>
 
 <ng-template #loadingTpl>
   <p class="booting">Loading room…</p>

@@ -1,0 +1,30 @@
+<aside class="chat-context">
+  <h3>Room info</h3>
+  <p class="muted small">{{ visibilityLabel }}</p>
+  <p class="muted small">Owner: {{ room.ownerUsername }}</p>
+
+  <h3>Admins</h3>
+  <ul class="member-list">
+    <li *ngFor="let a of admins()">
+      <app-presence-dot [userId]="a.userId"></app-presence-dot>
+      {{ a.username }}
+      <span class="badge">{{ a.role }}</span>
+    </li>
+    <li *ngIf="admins().length === 0" class="muted small">No admins.</li>
+  </ul>
+
+  <h3>Members ({{ members.length }})</h3>
+  <ul class="member-list">
+    <li *ngFor="let m of nonAdminMembers()">
+      <app-presence-dot [userId]="m.userId"></app-presence-dot>
+      {{ m.username }}
+    </li>
+    <li *ngIf="nonAdminMembers().length === 0" class="muted small">
+      No plain members yet.
+    </li>
+  </ul>
+
+  <div class="chat-context-actions" *ngIf="canManage()">
+    <button type="button" (click)="manageRequested.emit()">Manage room</button>
+  </div>
+</aside>

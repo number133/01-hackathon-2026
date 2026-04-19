@@ -1,46 +1,67 @@
-<section class="wide-card" *ngIf="dialog() as d">
-  <h1>
-    <app-presence-dot [userId]="d.counterpartId"></app-presence-dot>
-    {{ d.counterpartUsername }}
-  </h1>
-  <p *ngIf="d.frozen" class="muted">
-    This dialog is frozen — you can read history but cannot send. Add
-    <strong>{{ d.counterpartUsername }}</strong> as a friend again, or unblock them, to continue.
-  </p>
-  <div *ngIf="error() as msg" class="error">{{ msg }}</div>
+<div class="chat-shell" *ngIf="dialog() as d">
+  <app-chat-sidebar></app-chat-sidebar>
 
-  <div class="messages">
-    <article *ngFor="let m of messages()">
-      <header>
-        <strong>{{ m.authorUsername }}</strong>
-        <small>{{ m.createdAt | date: 'short' }}</small>
-        <small *ngIf="m.editedAt" class="muted">(edited)</small>
-      </header>
-      <p *ngIf="!m.deletedAt && m.body">{{ m.body }}</p>
-      <p *ngIf="m.deletedAt" class="muted">(deleted)</p>
-      <div *ngIf="!m.deletedAt && m.attachments?.length" class="attachments">
-        <app-attachment-view
-          *ngFor="let a of m.attachments"
-          [attachment]="a">
-        </app-attachment-view>
+  <section class="chat-main">
+    <header class="chat-header">
+      <div>
+        <h1>
+          <app-presence-dot [userId]="d.counterpartId"></app-presence-dot>
+          {{ d.counterpartUsername }}
+        </h1>
+        <p *ngIf="d.frozen" class="muted">
+          Frozen — you can read history but cannot send. Re-friend or unblock to continue.
+        </p>
       </div>
-    </article>
-    <div *ngIf="messages().length === 0" class="empty-state small">
-      No messages yet. Say hi!
-    </div>
-  </div>
+    </header>
 
-  <form (ngSubmit)="send()" *ngIf="!d.frozen">
-    <textarea
-      [formControl]="text"
-      (keydown)="handleKeydown($event)"
-      rows="2"
-      placeholder="Type a message. Enter to send, Shift+Enter for newline."
-    ></textarea>
-    <app-attachment-picker
-      [conversationId]="d.id"
-      (idsChange)="onAttachmentsChange($event)">
-    </app-attachment-picker>
-    <button type="submit" [disabled]="!canSend()">Send</button>
-  </form>
-</section>
+    <div *ngIf="error() as msg" class="error">{{ msg }}</div>
+
+    <div class="messages">
+      <article *ngFor="let m of messages()">
+        <header>
+          <strong>{{ m.authorUsername }}</strong>
+          <small>{{ m.createdAt | date: 'short' }}</small>
+          <small *ngIf="m.editedAt" class="muted">(edited)</small>
+        </header>
+        <p *ngIf="!m.deletedAt && m.body">{{ m.body }}</p>
+        <p *ngIf="m.deletedAt" class="muted">(deleted)</p>
+        <div *ngIf="!m.deletedAt && m.attachments?.length" class="attachments">
+          <app-attachment-view
+            *ngFor="let a of m.attachments"
+            [attachment]="a">
+          </app-attachment-view>
+        </div>
+      </article>
+      <div *ngIf="messages().length === 0" class="empty-state small">
+        No messages yet. Say hi!
+      </div>
+    </div>
+
+    <form (ngSubmit)="send()" *ngIf="!d.frozen" class="composer">
+      <textarea
+        [formControl]="text"
+        (keydown)="handleKeydown($event)"
+        rows="2"
+        placeholder="Type a message. Enter to send, Shift+Enter for newline."
+      ></textarea>
+      <app-attachment-picker
+        [conversationId]="d.id"
+        (idsChange)="onAttachmentsChange($event)">
+      </app-attachment-picker>
+      <button type="submit" [disabled]="!canSend()">Send</button>
+    </form>
+  </section>
+
+  <aside class="chat-context">
+    <h3>Contact</h3>
+    <p class="muted small">
+      <app-presence-dot [userId]="d.counterpartId"></app-presence-dot>
+      {{ d.counterpartUsername }}
+    </p>
+    <p class="muted small" *ngIf="d.frozen">
+      Status: frozen.
+      Either you or the other user blocked, or you are no longer friends.
+    </p>
+    <p class="muted small" *ngIf="!d.frozen">Status: active.</p>
+  </aside>
+</div>

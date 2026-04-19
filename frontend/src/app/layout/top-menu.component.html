@@ -3,25 +3,38 @@
 
   <nav>
     <ng-container *ngIf="user() as u; else anonymous">
-      <a routerLink="/rooms" routerLinkActive="active">
-        Rooms
+      <a routerLink="/rooms" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+        Public Rooms
         <span *ngIf="totalUnread() > 0" class="badge">{{ totalUnread() > 99 ? '99+' : totalUnread() }}</span>
       </a>
-      <a routerLink="/invitations" routerLinkActive="active">
-        Invitations
-        <span *ngIf="pendingInvites() > 0" class="badge">{{ pendingInvites() }}</span>
-      </a>
+      <a routerLink="/rooms/private" routerLinkActive="active">Private Rooms</a>
       <a routerLink="/contacts" routerLinkActive="active">Contacts</a>
-      <a routerLink="/friend-requests" routerLinkActive="active">
-        Requests
-        <span *ngIf="pendingFriendRequests() > 0" class="badge">{{ pendingFriendRequests() }}</span>
-      </a>
-      <a routerLink="/dialogs" routerLinkActive="active">DMs</a>
-      <a routerLink="/account" routerLinkActive="active">Account</a>
       <a routerLink="/sessions" routerLinkActive="active">Sessions</a>
+
       <span class="spacer"></span>
-      <span class="signed-in">signed in as <strong>{{ u.username }}</strong></span>
-      <button type="button" (click)="logout()">Sign out</button>
+
+      <div class="profile-menu" [class.open]="profileOpen()">
+        <button type="button" class="link profile-toggle" (click)="toggleProfile()">
+          {{ u.username }}
+          <span *ngIf="profileNotifications() > 0" class="badge">{{ profileNotifications() }}</span>
+          <span class="caret">▾</span>
+        </button>
+        <div class="profile-dropdown" *ngIf="profileOpen()">
+          <a routerLink="/account" (click)="closeProfile()">Account</a>
+          <a routerLink="/dialogs" (click)="closeProfile()">
+            Personal chats
+          </a>
+          <a routerLink="/invitations" (click)="closeProfile()">
+            Invitations
+            <span *ngIf="pendingInvites() > 0" class="badge">{{ pendingInvites() }}</span>
+          </a>
+          <a routerLink="/friend-requests" (click)="closeProfile()">
+            Friend requests
+            <span *ngIf="pendingFriendRequests() > 0" class="badge">{{ pendingFriendRequests() }}</span>
+          </a>
+          <button type="button" class="link danger signout" (click)="logout()">Sign out</button>
+        </div>
+      </div>
     </ng-container>
     <ng-template #anonymous>
       <span class="spacer"></span>

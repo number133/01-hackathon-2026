@@ -47,6 +47,12 @@ export const routes: Routes = [
     loadComponent: () => import('./rooms/rooms-catalog.component').then((m) => m.RoomsCatalogComponent),
   },
   {
+    path: 'rooms/private',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./rooms/private-rooms-catalog.component').then((m) => m.PrivateRoomsCatalogComponent),
+  },
+  {
     path: 'rooms/new',
     canActivate: [authGuard],
     loadComponent: () => import('./rooms/create-room.component').then((m) => m.CreateRoomComponent),

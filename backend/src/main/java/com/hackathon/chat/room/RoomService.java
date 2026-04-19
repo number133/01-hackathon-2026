@@ -132,6 +132,19 @@ public class RoomService {
     }
 
     @Transactional(readOnly = true)
+    public List<RoomView> listMine(UUID viewerId) {
+        List<UUID> roomIds = memberRepository.findAllByUserId(viewerId).stream()
+                .map(RoomMember::getRoomId)
+                .toList();
+        if (roomIds.isEmpty()) {
+            return List.of();
+        }
+        List<Room> rooms = roomRepository.findAllById(roomIds);
+        rooms.sort((a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+        return toViews(rooms, viewerId);
+    }
+
+    @Transactional(readOnly = true)
     public RoomView getForViewer(UUID roomId, UUID viewerId) {
         Room room = roomRepository.findById(roomId).orElseThrow(
                 () -> new NoSuchElementException("Room not found"));
