@@ -1,5 +1,7 @@
 package com.hackathon.chat.attachment;
 
+import com.hackathon.chat.common.RateLimiter;
+import com.hackathon.chat.common.TooManyRequestsException;
 import com.hackathon.chat.user.User;
 import com.hackathon.chat.user.UserService;
 import java.io.IOException;
@@ -28,10 +30,14 @@ public class AttachmentController {
 
     private final AttachmentService service;
     private final UserService userService;
+    private final RateLimiter rateLimiter;
 
-    public AttachmentController(AttachmentService service, UserService userService) {
+    public AttachmentController(AttachmentService service,
+                                UserService userService,
+                                RateLimiter rateLimiter) {
         this.service = service;
         this.userService = userService;
+        this.rateLimiter = rateLimiter;
     }
 
     @PostMapping
@@ -39,7 +45,12 @@ public class AttachmentController {
             @RequestParam("file") MultipartFile file,
             @RequestParam("conversationId") UUID conversationId,
             @RequestParam(value = "comment", required = false) String comment) throws IOException {
-        AttachmentView view = service.upload(me().getId(), conversationId, file, comment);
+        UUID userId = me().getId();
+        // Capacity 5 / refill 0.2 per second → ~12 uploads/min, 5 burst.
+        if (!rateLimiter.tryAcquire("attachments.upload", userId, 5, 0.2)) {
+            throw new TooManyRequestsException("attachments.upload");
+        }
+        AttachmentView view = service.upload(userId, conversationId, file, comment);
         return ResponseEntity.status(HttpStatus.CREATED).body(view);
     }
 

@@ -19,8 +19,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 @Transactional
@@ -33,6 +36,7 @@ public class UnreadService {
     private final RoomMemberRepository roomMemberRepository;
     private final DialogRepository dialogRepository;
     private final UserEventPublisher events;
+    private final SimpMessagingTemplate broker;
 
     public UnreadService(UnreadRepository repository,
                          ConversationService conversationService,
@@ -40,7 +44,8 @@ public class UnreadService {
                          RoomRepository roomRepository,
                          RoomMemberRepository roomMemberRepository,
                          DialogRepository dialogRepository,
-                         UserEventPublisher events) {
+                         UserEventPublisher events,
+                         SimpMessagingTemplate broker) {
         this.repository = repository;
         this.conversationService = conversationService;
         this.participantsQuery = participantsQuery;
@@ -48,6 +53,7 @@ public class UnreadService {
         this.roomMemberRepository = roomMemberRepository;
         this.dialogRepository = dialogRepository;
         this.events = events;
+        this.broker = broker;
     }
 
     public void initMarker(UUID userId, UUID conversationId, long atSeq) {
@@ -61,9 +67,6 @@ public class UnreadService {
     }
 
     public void bumpForMessage(UUID conversationId, UUID authorId, long newSeq) {
-        Set<UUID> participants = participantsQuery.participants(conversationId);
-        if (participants.isEmpty()) return;
-
         // Author's marker tracks last_seq so they don't see their own bump.
         UnreadMarkerId authorKey = new UnreadMarkerId(authorId, conversationId);
         UnreadMarker authorMarker = repository.findById(authorKey).orElse(null);
@@ -78,19 +81,26 @@ public class UnreadService {
             authorMarker.setLastReadSeq(newSeq);
         }
 
-        List<UUID> otherIds = new ArrayList<>(participants);
-        otherIds.remove(authorId);
-        if (otherIds.isEmpty()) return;
+        // One broadcast per message, regardless of participant count.
+        // Clients subscribed to the per-conversation topic derive their own
+        // count as (newSeq - clientLastRead).
+        afterCommit(() -> broker.convertAndSend(
+                "/topic/conversations/" + conversationId + "/unread",
+                Map.of("conversationId", conversationId.toString(),
+                        "authorId", authorId.toString(),
+                        "lastSeq", newSeq)));
+    }
 
-        Map<UUID, Long> readBy = new HashMap<>();
-        repository.findAllForUserInConversation(conversationId, otherIds)
-                .forEach(m -> readBy.put(m.getUserId(), m.getLastReadSeq()));
-
-        for (UUID userId : otherIds) {
-            long lastRead = readBy.getOrDefault(userId, 0L);
-            long count = Math.max(0L, newSeq - lastRead);
-            events.publish(userId, "unread.updated",
-                    Map.of("conversationId", conversationId.toString(), "count", count));
+    private static void afterCommit(Runnable r) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    r.run();
+                }
+            });
+        } else {
+            r.run();
         }
     }
 

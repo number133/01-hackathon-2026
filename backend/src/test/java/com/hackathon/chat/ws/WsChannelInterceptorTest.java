@@ -28,6 +28,7 @@ class WsChannelInterceptorTest {
     private RoomService roomService;
     private RoomBanRepository banRepo;
     private DialogService dialogService;
+    private com.hackathon.chat.unread.ConversationParticipantsQuery participantsQuery;
     private WsChannelInterceptor interceptor;
 
     @BeforeEach
@@ -36,7 +37,8 @@ class WsChannelInterceptorTest {
         roomService = Mockito.mock(RoomService.class);
         banRepo = Mockito.mock(RoomBanRepository.class);
         dialogService = Mockito.mock(DialogService.class);
-        interceptor = new WsChannelInterceptor(userService, roomService, banRepo, dialogService);
+        participantsQuery = Mockito.mock(com.hackathon.chat.unread.ConversationParticipantsQuery.class);
+        interceptor = new WsChannelInterceptor(userService, roomService, banRepo, dialogService, participantsQuery);
     }
 
     @Test

@@ -53,6 +53,16 @@ public class PresenceService {
         return out;
     }
 
+    public void dropTab(UUID userId, String tabId) {
+        Map<String, Long> perTab = tabs.get(userId);
+        if (perTab == null) return;
+        if (perTab.remove(tabId) == null) return;
+        if (perTab.isEmpty()) {
+            tabs.remove(userId, perTab);
+        }
+        publishIfChanged(userId, clock.millis());
+    }
+
     public void sweep() {
         long now = clock.millis();
         long offlineCutoff = now - props.afkThreshold().toMillis() - props.offlineGrace().toMillis();

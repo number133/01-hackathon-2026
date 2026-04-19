@@ -97,6 +97,13 @@ export class AttachmentPickerComponent {
     this.emit();
   }
 
+  enqueueFiles(files: FileList | File[] | null): number {
+    if (!files) return 0;
+    const arr = Array.from(files as ArrayLike<File>);
+    arr.forEach((f) => this.enqueue(f));
+    return arr.length;
+  }
+
   private enqueue(file: File): void {
     const key = crypto.randomUUID();
     const entry: PendingAttachment = { key, file, state: 'uploading', comment: '' };

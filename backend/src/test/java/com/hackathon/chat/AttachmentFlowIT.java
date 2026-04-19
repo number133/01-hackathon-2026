@@ -169,6 +169,31 @@ class AttachmentFlowIT {
     }
 
     @Test
+    void accountDeleteRemovesAttachmentDirectoriesOfOwnedRooms() throws Exception {
+        Cookie alice = register("att-ad-a@example.com", "attada", "supersecret");
+        String roomId = createRoom(alice, "att-ad-room");
+        String convId = conversationOf(roomId, alice);
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "d.bin", "application/octet-stream", "d".getBytes());
+        mvc.perform(multipart("/api/attachments")
+                        .file(file)
+                        .param("conversationId", convId)
+                        .cookie(alice).with(csrf()))
+                .andExpect(status().isCreated());
+
+        Path convDir = UPLOAD_ROOT.resolve(convId);
+        assertThat(Files.exists(convDir)).isTrue();
+
+        mvc.perform(delete("/api/account").cookie(alice).with(csrf())
+                        .contentType("application/json")
+                        .content("{\"password\":\"supersecret\"}"))
+                .andExpect(status().isNoContent());
+
+        assertThat(Files.exists(convDir)).isFalse();
+    }
+
+    @Test
     void roomDeleteRemovesAttachmentDirectory() throws Exception {
         Cookie alice = register("att-rd-a@example.com", "attrda", "supersecret");
         String roomId = createRoom(alice, "att-rd-room");

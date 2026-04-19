@@ -190,6 +190,13 @@ export class DialogViewComponent {
     }
   }
 
+  handlePaste(ev: ClipboardEvent): void {
+    const files = ev.clipboardData?.files;
+    if (!files || files.length === 0) return;
+    const consumed = this.picker?.enqueueFiles(files) ?? 0;
+    if (consumed > 0) ev.preventDefault();
+  }
+
   onReply(m: MessageView): void {
     this.replyingTo.set(m);
   }

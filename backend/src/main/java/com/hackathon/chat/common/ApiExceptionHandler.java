@@ -95,6 +95,11 @@ public class ApiExceptionHandler {
         return body(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "unsupported_media_type", ex.getMessage());
     }
 
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<Map<String, Object>> handleRateLimit(TooManyRequestsException ex) {
+        return body(HttpStatus.TOO_MANY_REQUESTS, "rate_limited", "Slow down");
+    }
+
     private ResponseEntity<Map<String, Object>> body(HttpStatus status, String error, String message) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("error", error);

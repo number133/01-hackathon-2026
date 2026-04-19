@@ -1,6 +1,8 @@
 package com.hackathon.chat.presence;
 
 import com.hackathon.chat.common.AccountConflictException;
+import com.hackathon.chat.common.RateLimiter;
+import com.hackathon.chat.common.TooManyRequestsException;
 import com.hackathon.chat.user.User;
 import com.hackathon.chat.user.UserService;
 import jakarta.validation.Valid;
@@ -25,18 +27,26 @@ public class PresenceController {
     private final PresenceService service;
     private final PresenceProperties props;
     private final UserService userService;
+    private final RateLimiter rateLimiter;
 
     public PresenceController(PresenceService service,
                               PresenceProperties props,
-                              UserService userService) {
+                              UserService userService,
+                              RateLimiter rateLimiter) {
         this.service = service;
         this.props = props;
         this.userService = userService;
+        this.rateLimiter = rateLimiter;
     }
 
     @PostMapping("/ping")
     public ResponseEntity<Void> ping(@Valid @RequestBody PresencePingRequest request) {
-        service.recordPing(me().getId(), request.tabId());
+        UUID userId = me().getId();
+        // Capacity 10 / refill 5 per second → sustained 5/s, small burst allowed.
+        if (!rateLimiter.tryAcquire("presence.ping", userId, 10, 5.0)) {
+            throw new TooManyRequestsException("presence.ping");
+        }
+        service.recordPing(userId, request.tabId());
         return ResponseEntity.noContent().build();
     }
 

@@ -81,6 +81,13 @@ export class ComposerComponent {
     }
   }
 
+  handlePaste(event: ClipboardEvent): void {
+    const files = event.clipboardData?.files;
+    if (!files || files.length === 0) return;
+    const consumed = this.picker?.enqueueFiles(files) ?? 0;
+    if (consumed > 0) event.preventDefault();
+  }
+
   insertEmoji(emoji: string): void {
     const next = (this.text.value ?? '') + emoji;
     if (next.length > 3072) return;

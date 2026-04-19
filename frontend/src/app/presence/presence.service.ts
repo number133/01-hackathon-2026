@@ -3,6 +3,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { catchError, of, take, tap } from 'rxjs';
 
 import { ChatService } from '../chat/chat.service';
+import { currentTabId } from '../core/tab-id';
 
 export type PresenceStatus = 'online' | 'afk' | 'offline';
 
@@ -16,7 +17,6 @@ interface PresenceConfigDto {
   pingIntervalMs: number;
 }
 
-const TAB_ID_KEY = 'chat.tabId';
 const DEFAULT_PING_INTERVAL_MS = 2000;
 const ACTIVITY_EVENTS: readonly (keyof WindowEventMap)[] = [
   'mousemove',
@@ -143,15 +143,7 @@ export class PresenceService {
     if (ids.length > 0) this.hydrate(ids);
   }
 
-  private tabId(): string {
-    try {
-      const existing = sessionStorage.getItem(TAB_ID_KEY);
-      if (existing) return existing;
-      const fresh = crypto.randomUUID();
-      sessionStorage.setItem(TAB_ID_KEY, fresh);
-      return fresh;
-    } catch {
-      return 'ephemeral';
-    }
+  tabId(): string {
+    return currentTabId();
   }
 }

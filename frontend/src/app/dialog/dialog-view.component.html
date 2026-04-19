@@ -39,6 +39,7 @@
       <textarea
         [formControl]="text"
         (keydown)="handleKeydown($event)"
+        (paste)="handlePaste($event)"
         rows="2"
         maxlength="3072"
         placeholder="Type a message. Enter to send, Shift+Enter for newline."

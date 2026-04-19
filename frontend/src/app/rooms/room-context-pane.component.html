@@ -7,8 +7,16 @@
   <ul class="member-list">
     <li *ngFor="let a of admins()">
       <app-presence-dot [userId]="a.userId"></app-presence-dot>
-      {{ a.username }}
+      <span class="grow">{{ a.username }}</span>
       <span class="badge">{{ a.role }}</span>
+      <button
+        *ngIf="canAddFriend(a)"
+        type="button"
+        class="link small"
+        [disabled]="sending() === a.userId"
+        (click)="addFriend(a)">
+        {{ sending() === a.userId ? '…' : '+ friend' }}
+      </button>
     </li>
     <li *ngIf="admins().length === 0" class="muted small">No admins.</li>
   </ul>
@@ -17,7 +25,15 @@
   <ul class="member-list">
     <li *ngFor="let m of nonAdminMembers()">
       <app-presence-dot [userId]="m.userId"></app-presence-dot>
-      {{ m.username }}
+      <span class="grow">{{ m.username }}</span>
+      <button
+        *ngIf="canAddFriend(m)"
+        type="button"
+        class="link small"
+        [disabled]="sending() === m.userId"
+        (click)="addFriend(m)">
+        {{ sending() === m.userId ? '…' : '+ friend' }}
+      </button>
     </li>
     <li *ngIf="nonAdminMembers().length === 0" class="muted small">
       No plain members yet.

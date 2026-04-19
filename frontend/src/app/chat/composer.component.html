@@ -9,7 +9,8 @@
     rows="2"
     maxlength="3072"
     placeholder="Type a message. Enter to send, Shift+Enter for newline."
-    (keydown)="handleKeydown($event)">
+    (keydown)="handleKeydown($event)"
+    (paste)="handlePaste($event)">
   </textarea>
 
   <app-attachment-picker

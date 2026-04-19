@@ -4,6 +4,7 @@ import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
 import { Observable, tap } from 'rxjs';
 
 import { NotificationService } from '../core/notification/notification.service';
+import { currentTabId } from '../core/tab-id';
 import { HistoryResponse, MESSAGE_PAGE_SIZE } from './pagination';
 
 export interface MessageReplyRef {
@@ -84,6 +85,7 @@ export class ChatService {
     this.client = new Client({
       brokerURL: url,
       reconnectDelay: 2000,
+      connectHeaders: { tabId: currentTabId() },
       onConnect: () => {
         const wasDisconnected = this.hasConnectedOnce && !this.connected;
         this.connected = true;

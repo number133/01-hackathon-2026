@@ -741,6 +741,13 @@ button.link.danger {
   gap: 6px;
 }
 
+.chat-context .member-list > li .grow {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .chat-context-actions {
   margin-top: 12px;
   display: flex;

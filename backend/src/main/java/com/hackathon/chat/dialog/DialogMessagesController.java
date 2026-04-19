@@ -1,5 +1,7 @@
 package com.hackathon.chat.dialog;
 
+import com.hackathon.chat.common.RateLimiter;
+import com.hackathon.chat.common.TooManyRequestsException;
 import com.hackathon.chat.message.HistoryPage;
 import com.hackathon.chat.message.MessageService;
 import com.hackathon.chat.message.MessageView;
@@ -26,16 +28,24 @@ public class DialogMessagesController {
 
     private final MessageService messageService;
     private final UserService userService;
+    private final RateLimiter rateLimiter;
 
-    public DialogMessagesController(MessageService messageService, UserService userService) {
+    public DialogMessagesController(MessageService messageService,
+                                    UserService userService,
+                                    RateLimiter rateLimiter) {
         this.messageService = messageService;
         this.userService = userService;
+        this.rateLimiter = rateLimiter;
     }
 
     @PostMapping
     public ResponseEntity<MessageView> post(@PathVariable UUID dialogId,
                                             @Valid @RequestBody SendMessageRequest request) {
-        MessageView view = messageService.postToDialog(me().getId(), dialogId, request);
+        UUID userId = me().getId();
+        if (!rateLimiter.tryAcquire("messages.post", userId, 20, 1.0)) {
+            throw new TooManyRequestsException("messages.post");
+        }
+        MessageView view = messageService.postToDialog(userId, dialogId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(view);
     }
 

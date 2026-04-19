@@ -3,6 +3,7 @@ package com.hackathon.chat.ws;
 import com.hackathon.chat.dialog.DialogService;
 import com.hackathon.chat.room.RoomBanRepository;
 import com.hackathon.chat.room.RoomService;
+import com.hackathon.chat.unread.ConversationParticipantsQuery;
 import com.hackathon.chat.user.User;
 import com.hackathon.chat.user.UserService;
 import java.util.UUID;
@@ -27,20 +28,29 @@ public class WsChannelInterceptor implements ChannelInterceptor {
     private static final String PRESENCE_PREFIX = "/topic/presence/";
     private static final String DIALOGS_PREFIX = "/topic/dialogs/";
     private static final String USERS_PREFIX = "/topic/users/";
+    private static final String CONVERSATIONS_PREFIX = "/topic/conversations/";
+    private static final String UNREAD_SUFFIX = "/unread";
 
     private final UserService userService;
     private final RoomService roomService;
     private final RoomBanRepository banRepository;
     private final DialogService dialogService;
+    private final ConversationParticipantsQuery participantsQuery;
 
     public WsChannelInterceptor(UserService userService,
                                 RoomService roomService,
                                 RoomBanRepository banRepository,
-                                @Lazy DialogService dialogService) {
+                                @Lazy DialogService dialogService,
+                                @Lazy ConversationParticipantsQuery participantsQuery) {
         this.userService = userService;
         this.roomService = roomService;
         this.banRepository = banRepository;
         this.dialogService = dialogService;
+        this.participantsQuery = participantsQuery;
+    }
+
+    private boolean isConversationParticipant(UUID conversationId, UUID userId) {
+        return participantsQuery.isParticipant(conversationId, userId);
     }
 
     @Override
@@ -97,6 +107,16 @@ public class WsChannelInterceptor implements ChannelInterceptor {
                 User user = currentUser(accessor);
                 if (!user.getId().equals(userId)) {
                     throw new AccessDeniedException("Cannot subscribe to another user's topic");
+                }
+                return message;
+            }
+            if (destination.startsWith(CONVERSATIONS_PREFIX) && destination.endsWith(UNREAD_SUFFIX)) {
+                String middle = destination.substring(CONVERSATIONS_PREFIX.length(),
+                        destination.length() - UNREAD_SUFFIX.length());
+                UUID conversationId = parseUuidOr403(middle, "Invalid conversation destination");
+                User user = currentUser(accessor);
+                if (!isConversationParticipant(conversationId, user.getId())) {
+                    throw new AccessDeniedException("Not a participant in this conversation");
                 }
                 return message;
             }

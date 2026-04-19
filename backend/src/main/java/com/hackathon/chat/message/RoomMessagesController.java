@@ -1,5 +1,7 @@
 package com.hackathon.chat.message;
 
+import com.hackathon.chat.common.RateLimiter;
+import com.hackathon.chat.common.TooManyRequestsException;
 import com.hackathon.chat.user.User;
 import com.hackathon.chat.user.UserService;
 import jakarta.validation.Valid;
@@ -22,16 +24,25 @@ public class RoomMessagesController {
 
     private final MessageService messageService;
     private final UserService userService;
+    private final RateLimiter rateLimiter;
 
-    public RoomMessagesController(MessageService messageService, UserService userService) {
+    public RoomMessagesController(MessageService messageService,
+                                  UserService userService,
+                                  RateLimiter rateLimiter) {
         this.messageService = messageService;
         this.userService = userService;
+        this.rateLimiter = rateLimiter;
     }
 
     @PostMapping
     public ResponseEntity<MessageView> post(@PathVariable UUID roomId,
                                             @Valid @RequestBody SendMessageRequest request) {
-        MessageView view = messageService.post(me().getId(), roomId, request);
+        UUID userId = me().getId();
+        // Capacity 20 / refill 1 per second → 60 msgs/min sustained, 20 burst.
+        if (!rateLimiter.tryAcquire("messages.post", userId, 20, 1.0)) {
+            throw new TooManyRequestsException("messages.post");
+        }
+        MessageView view = messageService.post(userId, roomId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(view);
     }
 
