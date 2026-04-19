@@ -96,6 +96,10 @@ export async function registerViaUi(page: Page, u: NewUser): Promise<void> {
   await page.getByRole('button', { name: /^Create account$/ }).click();
 }
 
+export async function logoutViaApi(request: APIRequestContext): Promise<void> {
+  await apiPost(request, '/api/auth/logout').catch(() => undefined);
+}
+
 export async function signOutViaUi(page: Page): Promise<void> {
   await page.locator('.profile-menu .profile-toggle').click();
   await page.locator('.profile-menu button.signout').click();
@@ -142,4 +146,121 @@ export async function createPublicRoom(
   });
   expect(res.ok(), `create room failed: ${res.status()} ${await res.text()}`).toBeTruthy();
   return (await res.json()) as CreatedRoom;
+}
+
+export async function createPrivateRoom(
+  request: APIRequestContext,
+  name: string,
+): Promise<CreatedRoom> {
+  const res = await apiPost(request, '/api/rooms', {
+    name,
+    description: 'e2e',
+    visibility: 'private',
+  });
+  expect(res.ok(), `create private room failed: ${res.status()} ${await res.text()}`).toBeTruthy();
+  return (await res.json()) as CreatedRoom;
+}
+
+export async function joinRoom(request: APIRequestContext, roomId: string): Promise<void> {
+  const res = await apiPost(request, `/api/rooms/${roomId}/join`);
+  expect(res.ok(), `join room ${roomId}: ${res.status()} ${await res.text()}`).toBeTruthy();
+}
+
+export async function whoamiId(request: APIRequestContext): Promise<string> {
+  const res = await request.get('/api/auth/me');
+  expect(res.ok(), `whoami: ${res.status()}`).toBeTruthy();
+  const body = (await res.json()) as { id: string };
+  return body.id;
+}
+
+export async function sendFriendRequest(
+  request: APIRequestContext,
+  username: string,
+  message?: string,
+): Promise<{ id: string }> {
+  const res = await apiPost(request, '/api/friend-requests', { username, message });
+  expect(
+    res.ok(),
+    `send friend request ${username}: ${res.status()} ${await res.text()}`,
+  ).toBeTruthy();
+  return (await res.json()) as { id: string };
+}
+
+export async function acceptFriendRequest(
+  request: APIRequestContext,
+  id: string,
+): Promise<void> {
+  const res = await apiPost(request, `/api/friend-requests/${id}/accept`);
+  expect(res.ok(), `accept ${id}: ${res.status()}`).toBeTruthy();
+}
+
+export async function makeFriends(
+  aCtxRequest: APIRequestContext,
+  aUsername: string,
+  bCtxRequest: APIRequestContext,
+  bUsername: string,
+): Promise<void> {
+  const reqRes = await apiPost(aCtxRequest, '/api/friend-requests', {
+    username: bUsername,
+  });
+  expect(reqRes.ok(), `A->B request: ${reqRes.status()} ${await reqRes.text()}`).toBeTruthy();
+  const list = await bCtxRequest.get('/api/friend-requests?direction=incoming');
+  expect(list.ok()).toBeTruthy();
+  const incoming = (await list.json()) as Array<{
+    id: string;
+    requester: { username: string };
+    status: string;
+  }>;
+  const match = incoming.find(
+    (r) => r.requester.username === aUsername && r.status === 'pending',
+  );
+  expect(match, `B did not receive request from ${aUsername}`).toBeTruthy();
+  const acc = await apiPost(bCtxRequest, `/api/friend-requests/${match!.id}/accept`);
+  expect(acc.ok(), `accept: ${acc.status()}`).toBeTruthy();
+}
+
+export async function openDialog(
+  request: APIRequestContext,
+  otherUserId: string,
+): Promise<{ id: string; conversationId: string }> {
+  const res = await apiPost(request, '/api/dialogs', { userId: otherUserId });
+  expect(res.ok(), `open dialog: ${res.status()} ${await res.text()}`).toBeTruthy();
+  return (await res.json()) as { id: string; conversationId: string };
+}
+
+export async function sendRoomMessage(
+  request: APIRequestContext,
+  roomId: string,
+  text: string,
+  opts: { replyToId?: string; attachmentIds?: string[] } = {},
+): Promise<{ id: string; seq: number }> {
+  const res = await apiPost(request, `/api/rooms/${roomId}/messages`, {
+    text,
+    replyToId: opts.replyToId ?? null,
+    attachmentIds: opts.attachmentIds ?? [],
+  });
+  expect(res.ok(), `send message: ${res.status()} ${await res.text()}`).toBeTruthy();
+  return (await res.json()) as { id: string; seq: number };
+}
+
+export async function uploadAttachment(
+  request: APIRequestContext,
+  conversationId: string,
+  file: { name: string; mimeType: string; buffer: Buffer },
+  comment?: string,
+): Promise<{ id: string; originalName: string; isImage: boolean }> {
+  await request.get('/api/auth/me').catch(() => undefined);
+  const state = await request.storageState();
+  const xsrf = state.cookies.find((c) => c.name === 'XSRF-TOKEN')?.value ?? '';
+  const multipart: Record<string, unknown> = {
+    conversationId,
+    file: { name: file.name, mimeType: file.mimeType, buffer: file.buffer },
+  };
+  if (comment) multipart.comment = comment;
+  const res = await request.post('/api/attachments', {
+    multipart,
+    headers: { 'X-XSRF-TOKEN': xsrf },
+  });
+  expect(res.ok(), `upload: ${res.status()} ${await res.text()}`).toBeTruthy();
+  return (await res.json()) as { id: string; originalName: string; isImage: boolean };
 }
