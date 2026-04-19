@@ -29,5 +29,7 @@
     </tbody>
   </table>
 
-  <p *ngIf="!loading() && sessions().length === 0" class="muted">No active sessions.</p>
+  <div *ngIf="!loading() && sessions().length === 0" class="empty-state">
+    <p>No active sessions.</p>
+  </div>
 </section>

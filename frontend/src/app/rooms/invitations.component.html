@@ -3,7 +3,10 @@
   <div *ngIf="loading()">Loading…</div>
   <div *ngIf="error() as msg" class="error">{{ msg }}</div>
 
-  <p *ngIf="!loading() && items().length === 0" class="muted">No pending invitations.</p>
+  <div *ngIf="!loading() && items().length === 0" class="empty-state">
+    <p>No pending invitations.</p>
+    <a routerLink="/rooms">Browse public rooms</a> while you wait.
+  </div>
 
   <ul class="invitation-list" *ngIf="items().length > 0">
     <li *ngFor="let inv of items()">

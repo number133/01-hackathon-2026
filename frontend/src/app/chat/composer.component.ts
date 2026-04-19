@@ -4,6 +4,7 @@ import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 
 import { AttachmentPickerComponent } from '../attachment/attachment-picker.component';
 import { AuthService } from '../auth/auth.service';
+import { NotificationService } from '../core/notification/notification.service';
 import { ChatService, MessageView } from './chat.service';
 
 @Component({
@@ -22,6 +23,7 @@ export class ComposerComponent {
 
   private readonly chat = inject(ChatService);
   private readonly auth = inject(AuthService);
+  private readonly notifications = inject(NotificationService);
 
   readonly text = new FormControl<string>('', {
     nonNullable: true,
@@ -59,7 +61,9 @@ export class ComposerComponent {
       },
       error: (err: unknown) => {
         this.submitting.set(false);
-        this.error.set(this.auth.errorText(err));
+        const text = this.auth.errorText(err);
+        this.error.set(text);
+        this.notifications.error(text);
       },
     });
   }

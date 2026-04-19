@@ -18,7 +18,7 @@ plans live under `howto/tasks/` (globally git-ignored on the dev machines).
 | 6     | Attachments                                       | Done         | 2026-04-18  |
 | 7     | Notifications and unread state                    | Done         | 2026-04-19  |
 | 8     | Admin UI polish                                   | Done         | 2026-04-19  |
-| 9     | End-to-end hardening for the demo                 | Not started  | —           |
+| 9     | End-to-end hardening for the demo                 | Done         | 2026-04-19  |
 | 10    | Stretch: Jabber / XMPP federation                 | Not started  | —           |
 
 ---
@@ -847,7 +847,136 @@ endpoints, no new tables, no new dependencies.
 
 ---
 
+## Phase 9 — End-to-end hardening for the demo (done, 2026-04-19)
+
+Goal: ship the demo-ready polish pass. Error toasts, consistent empty
+states, a dev-profile seeder so the jury sees a populated app on first
+login, the remaining `window.confirm()` removed, and the smoke script
+extended with a Phase 9 assertion block. No new migration, no new
+WebSocket topic, no npm dep.
+
+### Delivered
+
+- **Backend dev seeder.** `com.hackathon.chat.dev.DemoDataSeeder`
+  listens on `ApplicationReadyEvent` and is gated by
+  `@ConditionalOnProperty("chat.demo.seed-enabled" = true)`; the
+  docker-compose `app` service passes
+  `CHAT_DEMO_SEED_ENABLED=true` so the jury gets seeded data
+  automatically, while the IT suite boots without the property and
+  keeps its clean-DB contract. (Plan §2 originally called for
+  `@Profile("dev")`, but `application.yml` keeps `dev` as the
+  default profile for the bootRun convenience, so profile-gating
+  would have poisoned `AuthFlowIT` — which registers
+  `alice`/`bob`/`carol` usernames that collide with the seed. A
+  property is the right gate.) Seeds three accounts
+  (`alice`/`bob`/`carol@demo.test`, shared password
+  `DemoPass123!`), a public `general-demo` room with 5 alternating
+  messages, a private `ops-demo` room with a pending invitation for
+  Carol, the Alice↔Bob friendship plus a dialog with 3 messages,
+  and a pending Carol→Bob friend request. All steps are guarded by
+  existence checks (`userRepository.findByEmail`,
+  `roomRepository.findByName`, `friendService.areFriends`, dialog
+  history probe) so re-runs are no-ops.
+- **`DemoAccountsController`** is gated by the same
+  `chat.demo.seed-enabled` property and exposes the seed
+  credentials at `GET /api/dev/demo-accounts` so the landing page
+  can display them. `/api/dev/**` was already permit-listed in
+  `SecurityConfig` (from Phase 1 password-reset tokens), so no
+  security change was needed.
+- **`DemoDataSeederIT`** (two cases,
+  `@SpringBootTest(properties = "chat.demo.seed-enabled=true")` +
+  Testcontainers) asserts the seeded shape after boot and that
+  calling `seeder.seed()` a second time does not mutate counts or
+  message histories. The existing phase ITs do not set the
+  property, so the seeder bean isn't registered in their context
+  and the USERS table starts empty.
+- **Toast system.** `core/notification/NotificationService`
+  maintains a signal-backed queue capped at 5 (oldest dropped on
+  overflow), auto-dismiss after 5 s, manual dismiss via `×`.
+  `NotificationsComponent` is mounted once in `app.component.html`
+  and renders a fixed top-right stack; CSS adds three kinds
+  (success / info / error). Wired into every transient action path
+  called out in plan §9.1: contacts unfriend/ban/unban,
+  rooms-catalog join, room-view join/leave, manage-room
+  remove/ban/unban/invite/revoke/save/delete, friend-requests
+  send/accept/decline/revoke, invitations accept/decline, chat
+  composer send failures, attachment-picker upload failures, and
+  `ChatService` WS `Reconnecting…` / `Reconnected` notices (tracked
+  via a new `hasConnectedOnce` flag so the very first handshake
+  doesn't fire a spurious "Reconnected").
+- **`window.confirm()` eliminated.** The two remaining callers in
+  `contacts.component.ts` (unfriend, block) use the Phase 8 inline-
+  confirmation pattern (`pendingUnfriend` / `pendingBan` signals +
+  Confirm/Cancel row below the friend's row). `grep -n 'confirm(' frontend/src/app`
+  is now clean.
+- **Empty states.** A new `.empty-state` class (24 px dashed-border
+  panel with optional CTA) replaces `p.muted` for primary list
+  views: rooms catalog, dialogs catalog, contacts friends table,
+  friend-requests incoming/outgoing, invitations, active sessions,
+  room message-list, dialog message-list. Each empty state points to
+  exactly one next step where applicable (Create room, Contacts,
+  Send a request, Browse public rooms).
+- **Landing-page demo panel.** `DemoAccountsService` (new,
+  `core/demo/`) fetches `/api/dev/demo-accounts` with a
+  `catchError → []` fallback so a production build with the
+  controller absent just hides the panel. `HomeComponent` shows the
+  panel only when anonymous AND the list is non-empty; each row has
+  Copy email + Copy password buttons that use
+  `navigator.clipboard.writeText` and push a success toast.
+- **Smoke script.** New Phase 9 block asserts:
+  - `/api/dev/demo-accounts` returns ≥ 3 rows naming alice/bob/carol,
+  - login as alice with the seed password succeeds,
+  - public catalog contains `general-demo`,
+  - alice's `/api/friends` includes bob,
+  - the alice↔bob dialog exists and has ≥ 3 messages.
+
+### Verification
+
+- `./gradlew test` green, including the new `DemoDataSeederIT`
+  (2 tests) and every pre-existing IT (phases 0–8 unchanged).
+- `npm run build` (Angular strict production build) clean, only the
+  pre-existing `@stomp/stompjs` CommonJS notice carried over from
+  Phase 3.
+- `scripts/docker-smoke.sh` — ten blocks green on a clean rebuild
+  (phases 0, 1, 2, 3, 3.1, 4, 5, 6, 7, 9).
+- Manual walkthrough: fresh `docker compose down -v && up --build`
+  → landing page shows three seeded rows with Copy buttons → sign
+  in as Alice → general-demo with 5 seeded messages is visible,
+  Bob is a friend, alice↔bob dialog carries 3 seeded messages, the
+  top-right toast fires on every action path.
+
+### Known tradeoffs carried forward
+
+- **Seeder opt-in via `chat.demo.seed-enabled=true`.** The docker
+  demo wiring flips it on; nothing else does. A prod deployment
+  that omits the env var boots with an empty DB and a 404 on
+  `/api/dev/demo-accounts` — seed credentials never land in real
+  environments by accident.
+- **Hand-rolled toast stack, no `ngx-toastr`.** ~80 lines of
+  service + component + CSS covers the grading-relevant surface.
+  Re-enable condition: add the dep only if product needs custom
+  animations, position swaps, or a11y niceties the hand-roll
+  doesn't offer.
+- **No HTTP error interceptor toast.** Every call site that needed
+  a toast got one explicitly. Unhandled 5xx still falls back to the
+  `AuthService.errorText` inline error but won't toast. Re-enable
+  condition: if we see silent failures in the field, add a
+  `NotificationErrorInterceptor` that catches ≥ 500 and toasts a
+  generic "server error" without interfering with caller-side
+  handling.
+- **Demo seed is deterministic and shallow.** Five messages in the
+  public room and three in the dialog — enough to prove the
+  watermark, unread, and history paths. A 10k-message seed would
+  exercise Phase 3's infinite scroll live but slow every cold boot;
+  `LargeHistoryScrollIT` already covers that path in tests.
+- **Frontend unit tests still deferred.** `NotificationService` has
+  no test because the project has no Karma runner (tradeoff carried
+  from Phase 8). Coverage is the smoke script + manual walkthrough.
+  Re-enable condition: stand up Karma + Jasmine once a phase's
+  frontend logic genuinely needs unit coverage.
+
+---
+
 ## Next
 
-Phase 9 — end-to-end hardening for the demo (error toasts, empty
-states, seed script, smoke regression coverage, type-check sweep).
+Phase 10 — stretch: Jabber / XMPP federation (only if on schedule).

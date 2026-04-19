@@ -26,3 +26,29 @@
     </dl>
   </ng-container>
 </section>
+
+<section class="wide-card" *ngIf="!user() && demo().length > 0">
+  <h2>Demo accounts</h2>
+  <p class="muted">Shared password for every row. Click a cell to copy.</p>
+  <table>
+    <thead>
+      <tr>
+        <th>Email</th>
+        <th>Username</th>
+        <th>Password</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let a of demo()">
+        <td><code>{{ a.email }}</code></td>
+        <td>{{ a.username }}</td>
+        <td><code>{{ a.password }}</code></td>
+        <td>
+          <button type="button" class="small" (click)="copy(a.email)">Copy email</button>
+          <button type="button" class="small" (click)="copy(a.password)">Copy password</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</section>

@@ -5,6 +5,7 @@ import { Router, RouterLink } from '@angular/router';
 import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs';
 
 import { AuthService } from '../auth/auth.service';
+import { NotificationService } from '../core/notification/notification.service';
 import { UnreadBadgeComponent } from '../unread/unread-badge.component';
 import { UnreadService } from '../unread/unread.service';
 import { RoomService, RoomView } from './room.service';
@@ -19,6 +20,7 @@ export class RoomsCatalogComponent implements OnInit {
   private readonly roomService = inject(RoomService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly notifications = inject(NotificationService);
   readonly unread = inject(UnreadService);
 
   readonly search = new FormControl<string>('', { nonNullable: true });
@@ -61,8 +63,15 @@ export class RoomsCatalogComponent implements OnInit {
 
   join(room: RoomView): void {
     this.roomService.join(room.id).subscribe({
-      next: () => this.router.navigate(['/rooms', room.id]),
-      error: (err: unknown) => this.error.set(this.auth.errorText(err)),
+      next: () => {
+        this.notifications.success(`Joined ${room.name}`);
+        this.router.navigate(['/rooms', room.id]);
+      },
+      error: (err: unknown) => {
+        const text = this.auth.errorText(err);
+        this.error.set(text);
+        this.notifications.error(text);
+      },
     });
   }
 }

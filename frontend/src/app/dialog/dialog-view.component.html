@@ -25,6 +25,9 @@
         </app-attachment-view>
       </div>
     </article>
+    <div *ngIf="messages().length === 0" class="empty-state small">
+      No messages yet. Say hi!
+    </div>
   </div>
 
   <form (ngSubmit)="send()" *ngIf="!d.frozen">

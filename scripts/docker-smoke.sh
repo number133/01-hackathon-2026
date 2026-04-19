@@ -413,6 +413,49 @@ rm -f "$CAROL_JAR"
 
 green "  unread: post→2, author→0, mark-read→0, non-participant→403"
 
+# ───────────────────────── phase 9: demo seed + hardening ──────────────
+
+step "Phase 9 — dev demo seed is populated and reachable"
+
+SEED_LIST="$(curl -sS "${BASE_URL}/api/dev/demo-accounts")"
+SEED_COUNT="$(python3 -c "import sys,json; print(len(json.loads(sys.stdin.read())))" <<<"$SEED_LIST")"
+[[ "$SEED_COUNT" -ge 3 ]] || fail "demo-accounts endpoint should return ≥ 3 rows: $SEED_LIST"
+echo "$SEED_LIST" | grep -q "alice@demo.test" || fail "seed list missing alice: $SEED_LIST"
+echo "$SEED_LIST" | grep -q "bob@demo.test" || fail "seed list missing bob: $SEED_LIST"
+echo "$SEED_LIST" | grep -q "carol@demo.test" || fail "seed list missing carol: $SEED_LIST"
+
+SEED_JAR="$(mktemp)"
+trap 'cleanup; rm -f "$SEED_JAR" 2>/dev/null || true' EXIT
+seed_csrf "$SEED_JAR"
+call POST /api/auth/login --jar "$SEED_JAR" \
+     --body '{"email":"alice@demo.test","password":"DemoPass123!","rememberMe":false}' \
+     >/dev/null
+
+CATALOG="$(call GET /api/rooms --jar "$SEED_JAR")"
+echo "$CATALOG" | grep -q "general-demo" \
+  || fail "public catalog missing seeded general-demo: $CATALOG"
+
+SEED_FRIENDS="$(call GET /api/friends --jar "$SEED_JAR")"
+echo "$SEED_FRIENDS" | grep -q '"username":"bob"' \
+  || fail "alice's friends should include bob: $SEED_FRIENDS"
+
+SEED_DIALOGS="$(call GET /api/dialogs --jar "$SEED_JAR")"
+SEED_DLG_ID="$(python3 -c "import sys,json
+d=json.loads(sys.stdin.read())
+for v in d:
+  if v['counterpartUsername']=='bob':
+    print(v['id']); break
+" <<<"$SEED_DIALOGS")"
+[[ -n "$SEED_DLG_ID" ]] || fail "alice↔bob dialog not found: $SEED_DIALOGS"
+
+SEED_DM_HIST="$(call GET "/api/dialogs/$SEED_DLG_ID/messages" --jar "$SEED_JAR")"
+DM_COUNT="$(python3 -c "import sys,json
+d=json.loads(sys.stdin.read())
+print(len(d['items']))" <<<"$SEED_DM_HIST")"
+[[ "$DM_COUNT" -ge 3 ]] || fail "seeded dialog should have ≥ 3 messages: $SEED_DM_HIST"
+
+green "  demo seed ok — 3 accounts, general-demo public, alice↔bob dialog with $DM_COUNT msgs"
+
 # ───────────────────────── static assets ─────────────────────────────────
 
 step "Static — SPA fallback and Angular bundle"
@@ -428,4 +471,4 @@ green "  SPA fallback serves index.html for /rooms/<id>"
 # ───────────────────────── done ──────────────────────────────────────────
 
 green ""
-green "All docker smoke checks passed (phases 0, 1, 2, 3, 3.1, 4, 5, 6, 7)."
+green "All docker smoke checks passed (phases 0, 1, 2, 3, 3.1, 4, 5, 6, 7, 9)."

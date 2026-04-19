@@ -3,6 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, EventEmitter, HostListener, Input, Output, inject, signal } from '@angular/core';
 
 import { AuthService } from '../auth/auth.service';
+import { NotificationService } from '../core/notification/notification.service';
 import { AttachmentService, AttachmentView } from './attachment.service';
 
 interface PendingAttachment {
@@ -60,6 +61,7 @@ export class AttachmentPickerComponent {
 
   private readonly service = inject(AttachmentService);
   private readonly auth = inject(AuthService);
+  private readonly notifications = inject(NotificationService);
 
   readonly pending = signal<PendingAttachment[]>([]);
 
@@ -111,6 +113,7 @@ export class AttachmentPickerComponent {
         this.pending.update((list) =>
           list.map((p) => (p.key === key ? { ...p, state: 'error', error: msg } : p)),
         );
+        this.notifications.error(`${file.name}: ${msg}`);
       },
     });
   }

@@ -5,6 +5,7 @@ import { RouterOutlet } from '@angular/router';
 import { AuthService } from './auth/auth.service';
 import { ChatService } from './chat/chat.service';
 import { FriendService } from './contacts/friend.service';
+import { NotificationsComponent } from './core/notification/notifications.component';
 import { TopMenuComponent } from './layout/top-menu.component';
 import { PresenceService } from './presence/presence.service';
 import { UnreadService } from './unread/unread.service';
@@ -12,7 +13,7 @@ import { UnreadService } from './unread/unread.service';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, TopMenuComponent],
+  imports: [CommonModule, RouterOutlet, TopMenuComponent, NotificationsComponent],
   templateUrl: './app.component.html',
 })
 export class AppComponent {

@@ -5,6 +5,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../auth/auth.service';
 import { ComposerComponent } from '../chat/composer.component';
 import { MessageListComponent } from '../chat/message-list.component';
+import { NotificationService } from '../core/notification/notification.service';
 import { ManageRoomComponent } from './manage-room.component';
 import { RoomMemberView, RoomService, RoomView } from './room.service';
 
@@ -19,6 +20,7 @@ export class RoomViewComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly rooms = inject(RoomService);
   private readonly auth = inject(AuthService);
+  private readonly notifications = inject(NotificationService);
 
   readonly room = signal<RoomView | null>(null);
   readonly members = signal<RoomMemberView[]>([]);
@@ -66,8 +68,15 @@ export class RoomViewComponent implements OnInit {
     const r = this.room();
     if (!r) return;
     this.rooms.join(r.id).subscribe({
-      next: () => this.load(r.id),
-      error: (err: unknown) => this.error.set(this.auth.errorText(err)),
+      next: () => {
+        this.notifications.success(`Joined ${r.name}`);
+        this.load(r.id);
+      },
+      error: (err: unknown) => {
+        const text = this.auth.errorText(err);
+        this.error.set(text);
+        this.notifications.error(text);
+      },
     });
   }
 
@@ -75,8 +84,15 @@ export class RoomViewComponent implements OnInit {
     const r = this.room();
     if (!r) return;
     this.rooms.leave(r.id).subscribe({
-      next: () => this.router.navigate(['/rooms']),
-      error: (err: unknown) => this.error.set(this.auth.errorText(err)),
+      next: () => {
+        this.notifications.success(`Left ${r.name}`);
+        this.router.navigate(['/rooms']);
+      },
+      error: (err: unknown) => {
+        const text = this.auth.errorText(err);
+        this.error.set(text);
+        this.notifications.error(text);
+      },
     });
   }
 }

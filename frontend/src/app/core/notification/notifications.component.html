@@ -1,0 +1,6 @@
+<div class="toast-stack" *ngIf="items().length > 0">
+  <div *ngFor="let n of items()" class="toast toast-{{ n.kind }}">
+    <span class="toast-text">{{ n.text }}</span>
+    <button type="button" class="toast-close" (click)="dismiss(n.id)" aria-label="Dismiss">×</button>
+  </div>
+</div>

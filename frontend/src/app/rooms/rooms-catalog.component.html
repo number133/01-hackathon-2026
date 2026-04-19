@@ -11,7 +11,7 @@
   <div *ngIf="loading()" class="muted">Loading…</div>
   <div *ngIf="error() as msg" class="error">{{ msg }}</div>
 
-  <ul class="rooms-list" *ngIf="!loading()">
+  <ul class="rooms-list" *ngIf="!loading() && rooms().length > 0">
     <li *ngFor="let room of rooms()">
       <div class="row between">
         <div>
@@ -26,6 +26,10 @@
         </div>
       </div>
     </li>
-    <li *ngIf="rooms().length === 0" class="muted">No rooms match.</li>
   </ul>
+
+  <div *ngIf="!loading() && rooms().length === 0" class="empty-state">
+    <p>No public rooms yet.</p>
+    <a routerLink="/rooms/new">Create the first one</a>.
+  </div>
 </section>

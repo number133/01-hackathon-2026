@@ -3,20 +3,41 @@
   <div *ngIf="error() as msg" class="error">{{ msg }}</div>
 
   <h2>Friends</h2>
-  <p class="muted" *ngIf="list().length === 0">
-    No friends yet. <a routerLink="/friend-requests">Send a request</a>.
-  </p>
+  <div *ngIf="list().length === 0" class="empty-state">
+    <p>No friends yet.</p>
+    <a routerLink="/friend-requests">Send a request</a> to get started.
+  </div>
   <table *ngIf="list().length > 0">
     <thead><tr><th>Name</th><th>Actions</th></tr></thead>
     <tbody>
-      <tr *ngFor="let f of list()">
-        <td><app-presence-dot [userId]="f.userId"></app-presence-dot>{{ f.username }}</td>
-        <td>
-          <button type="button" class="small" (click)="openDialog(f.userId)">Open chat</button>
-          <button type="button" class="small" (click)="unfriend(f.userId, f.username)">Unfriend</button>
-          <button type="button" class="small danger" (click)="ban(f.userId, f.username)">Block</button>
-        </td>
-      </tr>
+      <ng-container *ngFor="let f of list()">
+        <tr>
+          <td><app-presence-dot [userId]="f.userId"></app-presence-dot>{{ f.username }}</td>
+          <td>
+            <button type="button" class="small" (click)="openDialog(f.userId)">Open chat</button>
+            <button type="button" class="small" (click)="requestUnfriend(f.userId, f.username)">Unfriend</button>
+            <button type="button" class="small danger" (click)="requestBan(f.userId, f.username)">Block</button>
+          </td>
+        </tr>
+        <tr *ngIf="pendingUnfriend()?.userId === f.userId">
+          <td colspan="2">
+            <div class="inline-confirm">
+              <span class="message">Unfriend {{ f.username }}? They stay reachable by a fresh request.</span>
+              <button type="button" class="small danger" (click)="confirmUnfriend()">Confirm</button>
+              <button type="button" class="small" (click)="cancelUnfriend()">Cancel</button>
+            </div>
+          </td>
+        </tr>
+        <tr *ngIf="pendingBan()?.userId === f.userId">
+          <td colspan="2">
+            <div class="inline-confirm">
+              <span class="message">Block {{ f.username }}? Ends the friendship, freezes the dialog, blocks new DMs.</span>
+              <button type="button" class="small danger" (click)="confirmBan()">Confirm</button>
+              <button type="button" class="small" (click)="cancelBan()">Cancel</button>
+            </div>
+          </td>
+        </tr>
+      </ng-container>
     </tbody>
   </table>
 
@@ -25,7 +46,7 @@
   <ul *ngIf="bans().length > 0">
     <li *ngFor="let b of bans()">
       {{ b.username }}
-      <button type="button" class="small" (click)="unban(b.userId)">Unblock</button>
+      <button type="button" class="small" (click)="unban(b.userId, b.username)">Unblock</button>
     </li>
   </ul>
 </section>

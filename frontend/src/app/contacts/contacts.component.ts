@@ -3,10 +3,16 @@ import { Component, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 
 import { AuthService } from '../auth/auth.service';
+import { NotificationService } from '../core/notification/notification.service';
 import { DialogService } from '../dialog/dialog.service';
 import { PresenceDotComponent } from '../presence/presence-dot.component';
 import { PresenceService } from '../presence/presence.service';
 import { FriendService } from './friend.service';
+
+interface PendingAction {
+  userId: string;
+  username: string;
+}
 
 @Component({
   selector: 'app-contacts',
@@ -19,17 +25,19 @@ export class ContactsComponent {
   private readonly dialogs = inject(DialogService);
   private readonly presence = inject(PresenceService);
   private readonly auth = inject(AuthService);
+  private readonly notifications = inject(NotificationService);
   private readonly router = inject(Router);
 
   readonly error = signal<string | null>(null);
   readonly list = this.friends.friends;
   readonly bans = this.friends.bans;
+  readonly pendingUnfriend = signal<PendingAction | null>(null);
+  readonly pendingBan = signal<PendingAction | null>(null);
 
   private watched: string[] = [];
 
   ngOnInit(): void {
     this.friends.refreshAll();
-    // Watch presence for every current friend; refresh watch set when list changes.
     this.rewatch();
   }
 
@@ -47,27 +55,68 @@ export class ContactsComponent {
   openDialog(userId: string): void {
     this.dialogs.open(userId).subscribe({
       next: (d) => this.router.navigate(['/dialogs', d.id]),
-      error: (err: unknown) => this.error.set(this.auth.errorText(err)),
+      error: (err: unknown) => {
+        const text = this.auth.errorText(err);
+        this.error.set(text);
+        this.notifications.error(text);
+      },
     });
   }
 
-  unfriend(userId: string, username: string): void {
-    if (!confirm(`Unfriend ${username}? They stay reachable by a fresh request.`)) return;
-    this.friends.unfriend(userId).subscribe({
-      error: (err: unknown) => this.error.set(this.auth.errorText(err)),
+  requestUnfriend(userId: string, username: string): void {
+    this.pendingBan.set(null);
+    this.pendingUnfriend.set({ userId, username });
+  }
+
+  confirmUnfriend(): void {
+    const pending = this.pendingUnfriend();
+    if (!pending) return;
+    this.pendingUnfriend.set(null);
+    this.friends.unfriend(pending.userId).subscribe({
+      next: () => this.notifications.success(`Unfriended ${pending.username}`),
+      error: (err: unknown) => {
+        const text = this.auth.errorText(err);
+        this.error.set(text);
+        this.notifications.error(text);
+      },
     });
   }
 
-  ban(userId: string, username: string): void {
-    if (!confirm(`Block ${username}? Ends the friendship, freezes the dialog, blocks new DMs.`)) return;
-    this.friends.ban(userId).subscribe({
-      error: (err: unknown) => this.error.set(this.auth.errorText(err)),
+  cancelUnfriend(): void {
+    this.pendingUnfriend.set(null);
+  }
+
+  requestBan(userId: string, username: string): void {
+    this.pendingUnfriend.set(null);
+    this.pendingBan.set({ userId, username });
+  }
+
+  confirmBan(): void {
+    const pending = this.pendingBan();
+    if (!pending) return;
+    this.pendingBan.set(null);
+    this.friends.ban(pending.userId).subscribe({
+      next: () => this.notifications.success(`Blocked ${pending.username}`),
+      error: (err: unknown) => {
+        const text = this.auth.errorText(err);
+        this.error.set(text);
+        this.notifications.error(text);
+      },
     });
   }
 
-  unban(userId: string): void {
+  cancelBan(): void {
+    this.pendingBan.set(null);
+  }
+
+  unban(userId: string, username: string): void {
     this.friends.unban(userId).subscribe({
-      error: (err: unknown) => this.error.set(this.auth.errorText(err)),
+      next: () => this.notifications.success(`Unblocked ${username}`),
+      error: (err: unknown) => {
+        const text = this.auth.errorText(err);
+        this.error.set(text);
+        this.notifications.error(text);
+      },
     });
   }
 }

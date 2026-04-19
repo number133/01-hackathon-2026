@@ -2,9 +2,10 @@
   <h1>Personal chats</h1>
   <div *ngIf="error() as msg" class="error">{{ msg }}</div>
 
-  <p class="muted" *ngIf="items().length === 0">
-    No personal chats yet. Open one from your <a routerLink="/contacts">Contacts</a>.
-  </p>
+  <div *ngIf="items().length === 0" class="empty-state">
+    <p>No personal chats yet.</p>
+    Open one from your <a routerLink="/contacts">Contacts</a>.
+  </div>
   <ul *ngIf="items().length > 0">
     <li *ngFor="let d of items()">
       <a [routerLink]="['/dialogs', d.id]">

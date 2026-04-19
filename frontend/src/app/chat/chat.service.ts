@@ -3,6 +3,8 @@ import { Injectable, inject, signal } from '@angular/core';
 import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
 import { Observable, tap } from 'rxjs';
 
+import { NotificationService } from '../core/notification/notification.service';
+
 export interface MessageReplyRef {
   id: string;
   seq: number;
@@ -59,10 +61,12 @@ const EMPTY_STATE: RoomState = {
 @Injectable({ providedIn: 'root' })
 export class ChatService {
   private readonly http = inject(HttpClient);
+  private readonly notifications = inject(NotificationService);
   private readonly rooms = signal<Record<string, RoomState>>({});
 
   private client: Client | null = null;
   private connected = false;
+  private hasConnectedOnce = false;
   private readonly pendingSubscriptions = new Map<string, number>();
   private readonly subscriptions = new Map<string, StompSubscription>();
   private readonly topicHandlers = new Map<string, Set<(body: unknown) => void>>();
@@ -80,7 +84,12 @@ export class ChatService {
       brokerURL: url,
       reconnectDelay: 2000,
       onConnect: () => {
+        const wasDisconnected = this.hasConnectedOnce && !this.connected;
         this.connected = true;
+        if (wasDisconnected) {
+          this.notifications.success('Reconnected');
+        }
+        this.hasConnectedOnce = true;
         for (const roomId of this.pendingSubscriptions.keys()) {
           this.wireSubscription(roomId);
         }
@@ -89,22 +98,25 @@ export class ChatService {
         }
       },
       onDisconnect: () => {
-        this.connected = false;
-        this.subscriptions.clear();
-        this.topicSubs.clear();
+        this.handleConnectionLoss();
       },
       onStompError: () => {
-        this.connected = false;
-        this.subscriptions.clear();
-        this.topicSubs.clear();
+        this.handleConnectionLoss();
       },
       onWebSocketClose: () => {
-        this.connected = false;
-        this.subscriptions.clear();
-        this.topicSubs.clear();
+        this.handleConnectionLoss();
       },
     });
     this.client.activate();
+  }
+
+  private handleConnectionLoss(): void {
+    if (this.connected && this.hasConnectedOnce) {
+      this.notifications.info('Reconnecting…');
+    }
+    this.connected = false;
+    this.subscriptions.clear();
+    this.topicSubs.clear();
   }
 
   subscribeRoom(roomId: string): void {

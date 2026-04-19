@@ -27,6 +27,7 @@ services:
       SPRING_DATASOURCE_USERNAME: chat
       SPRING_DATASOURCE_PASSWORD: chat
       SPRING_PROFILES_ACTIVE: dev
+      CHAT_DEMO_SEED_ENABLED: "true"
     ports:
       - "8080:8080"
     volumes:

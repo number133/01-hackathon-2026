@@ -9,7 +9,7 @@
     (reply)="onReply($event)">
   </app-message-item>
 
-  <p *ngIf="messages().length === 0 && !loading()" class="muted small center">
+  <div *ngIf="messages().length === 0 && !loading()" class="empty-state small">
     No messages yet. Say hi!
-  </p>
+  </div>
 </div>

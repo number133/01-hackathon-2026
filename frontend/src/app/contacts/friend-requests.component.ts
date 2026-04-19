@@ -3,6 +3,7 @@ import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 
 import { AuthService } from '../auth/auth.service';
+import { NotificationService } from '../core/notification/notification.service';
 import { FriendService } from './friend.service';
 
 @Component({
@@ -15,6 +16,7 @@ export class FriendRequestsComponent {
   private readonly friends = inject(FriendService);
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
+  private readonly notifications = inject(NotificationService);
 
   readonly form = this.fb.nonNullable.group({
     username: ['', [Validators.required, Validators.maxLength(40)]],
@@ -32,24 +34,34 @@ export class FriendRequestsComponent {
       next: () => {
         this.form.reset({ username: '', message: '' });
         this.error.set(null);
+        this.notifications.success(`Friend request sent to ${username}`);
       },
-      error: (err: unknown) => this.error.set(this.auth.errorText(err)),
+      error: (err: unknown) => this.handleError(err),
     });
   }
 
   accept(id: string): void {
     this.friends.accept(id).subscribe({
-      error: (err: unknown) => this.error.set(this.auth.errorText(err)),
+      next: () => this.notifications.success('Friend request accepted'),
+      error: (err: unknown) => this.handleError(err),
     });
   }
   decline(id: string): void {
     this.friends.decline(id).subscribe({
-      error: (err: unknown) => this.error.set(this.auth.errorText(err)),
+      next: () => this.notifications.info('Friend request declined'),
+      error: (err: unknown) => this.handleError(err),
     });
   }
   revoke(id: string): void {
     this.friends.revoke(id).subscribe({
-      error: (err: unknown) => this.error.set(this.auth.errorText(err)),
+      next: () => this.notifications.info('Friend request revoked'),
+      error: (err: unknown) => this.handleError(err),
     });
+  }
+
+  private handleError(err: unknown): void {
+    const text = this.auth.errorText(err);
+    this.error.set(text);
+    this.notifications.error(text);
   }
 }

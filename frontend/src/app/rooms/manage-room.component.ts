@@ -15,6 +15,7 @@ import {
 import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 
 import { AuthService } from '../auth/auth.service';
+import { NotificationService } from '../core/notification/notification.service';
 import { PresenceDotComponent } from '../presence/presence-dot.component';
 import { PresenceService } from '../presence/presence.service';
 import { InvitationService, InvitationView } from './invitation.service';
@@ -39,6 +40,7 @@ export class ManageRoomComponent implements OnInit, OnChanges, OnDestroy {
   private readonly invitations = inject(InvitationService);
   private readonly auth = inject(AuthService);
   private readonly presence = inject(PresenceService);
+  private readonly notifications = inject(NotificationService);
   private readonly fb = inject(FormBuilder);
 
   @Input({ required: true }) roomId!: string;
@@ -189,8 +191,15 @@ export class ManageRoomComponent implements OnInit, OnChanges, OnDestroy {
     if (!pending) return;
     this.pendingRemove.set(null);
     this.rooms.remove(this.roomId, pending.userId).subscribe({
-      next: () => this.loadMembers(this.roomId),
-      error: (err: unknown) => this.error.set(this.auth.errorText(err)),
+      next: () => {
+        this.notifications.success(`Removed ${pending.username}`);
+        this.loadMembers(this.roomId);
+      },
+      error: (err: unknown) => {
+        const text = this.auth.errorText(err);
+        this.error.set(text);
+        this.notifications.error(text);
+      },
     });
   }
 
@@ -211,17 +220,29 @@ export class ManageRoomComponent implements OnInit, OnChanges, OnDestroy {
     this.pendingBan.set(null);
     this.rooms.ban(this.roomId, pending.userId, reason.length > 0 ? reason : null).subscribe({
       next: () => {
+        this.notifications.success(`Banned ${pending.username}`);
         this.loadMembers(this.roomId);
         this.loadBans(this.roomId);
       },
-      error: (err: unknown) => this.error.set(this.auth.errorText(err)),
+      error: (err: unknown) => {
+        const text = this.auth.errorText(err);
+        this.error.set(text);
+        this.notifications.error(text);
+      },
     });
   }
 
   unban(userId: string): void {
     this.rooms.unban(this.roomId, userId).subscribe({
-      next: () => this.loadBans(this.roomId),
-      error: (err: unknown) => this.error.set(this.auth.errorText(err)),
+      next: () => {
+        this.notifications.success('User unbanned');
+        this.loadBans(this.roomId);
+      },
+      error: (err: unknown) => {
+        const text = this.auth.errorText(err);
+        this.error.set(text);
+        this.notifications.error(text);
+      },
     });
   }
 
@@ -232,16 +253,28 @@ export class ManageRoomComponent implements OnInit, OnChanges, OnDestroy {
       next: () => {
         this.inviteUsername.reset({ username: '', message: '' });
         this.error.set(null);
+        this.notifications.success(`Invite sent to ${username}`);
         this.loadInvites(this.roomId);
       },
-      error: (err: unknown) => this.error.set(this.auth.errorText(err)),
+      error: (err: unknown) => {
+        const text = this.auth.errorText(err);
+        this.error.set(text);
+        this.notifications.error(text);
+      },
     });
   }
 
   revokeInvite(invitationId: string): void {
     this.invitations.revoke(invitationId).subscribe({
-      next: () => this.loadInvites(this.roomId),
-      error: (err: unknown) => this.error.set(this.auth.errorText(err)),
+      next: () => {
+        this.notifications.success('Invitation revoked');
+        this.loadInvites(this.roomId);
+      },
+      error: (err: unknown) => {
+        const text = this.auth.errorText(err);
+        this.error.set(text);
+        this.notifications.error(text);
+      },
     });
   }
 
@@ -249,8 +282,15 @@ export class ManageRoomComponent implements OnInit, OnChanges, OnDestroy {
     if (this.settingsForm.invalid) return;
     const patch: UpdateRoomPayload = this.settingsForm.getRawValue();
     this.rooms.update(this.roomId, patch).subscribe({
-      next: (r) => this.room.set(r),
-      error: (err: unknown) => this.error.set(this.auth.errorText(err)),
+      next: (r) => {
+        this.room.set(r);
+        this.notifications.success('Room settings saved');
+      },
+      error: (err: unknown) => {
+        const text = this.auth.errorText(err);
+        this.error.set(text);
+        this.notifications.error(text);
+      },
     });
   }
 
@@ -263,12 +303,18 @@ export class ManageRoomComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   confirmDeleteRoom(): void {
+    const roomName = this.room()?.name ?? 'Room';
     this.rooms.delete(this.roomId).subscribe({
       next: () => {
         this.confirmingDelete.set(false);
+        this.notifications.success(`${roomName} deleted`);
         this.closed.emit();
       },
-      error: (err: unknown) => this.error.set(this.auth.errorText(err)),
+      error: (err: unknown) => {
+        const text = this.auth.errorText(err);
+        this.error.set(text);
+        this.notifications.error(text);
+      },
     });
   }
 }

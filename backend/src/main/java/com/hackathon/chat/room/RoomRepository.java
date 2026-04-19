@@ -18,6 +18,8 @@ public interface RoomRepository extends JpaRepository<Room, UUID> {
 
     Optional<Room> findByConversationId(UUID conversationId);
 
+    Optional<Room> findByName(String name);
+
     @Query("""
             SELECT r FROM Room r
             WHERE r.visibility = 'public'

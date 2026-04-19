@@ -10,7 +10,9 @@
   </form>
 
   <h2>Incoming</h2>
-  <p class="muted" *ngIf="incoming().length === 0">No incoming requests.</p>
+  <div class="empty-state small" *ngIf="incoming().length === 0">
+    No incoming requests right now.
+  </div>
   <ul *ngIf="incoming().length > 0">
     <li *ngFor="let r of incoming()">
       <strong>{{ r.requester.username }}</strong>
@@ -24,7 +26,9 @@
   </ul>
 
   <h2>Outgoing</h2>
-  <p class="muted" *ngIf="outgoing().length === 0">No outgoing requests.</p>
+  <div class="empty-state small" *ngIf="outgoing().length === 0">
+    No outgoing requests. Send one using the form above.
+  </div>
   <ul *ngIf="outgoing().length > 0">
     <li *ngFor="let r of outgoing()">
       <strong>{{ r.recipient.username }}</strong>
