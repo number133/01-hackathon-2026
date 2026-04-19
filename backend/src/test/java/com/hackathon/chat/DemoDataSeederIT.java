@@ -63,7 +63,7 @@ class DemoDataSeederIT {
         Room publicRoom = roomRepository.findByName(DemoDataSeeder.PUBLIC_ROOM_NAME).orElseThrow();
         assertThat(publicRoom.isPublic()).isTrue();
         assertThat(publicRoom.getOwnerId()).isEqualTo(alice.getId());
-        List<MessageView> history = messageService.history(publicRoom.getId(), alice.getId(), null, 100);
+        List<MessageView> history = messageService.history(publicRoom.getId(), alice.getId(), null, 100).items();
         assertThat(history).hasSizeGreaterThanOrEqualTo(5);
 
         Room privateRoom = roomRepository.findByName(DemoDataSeeder.PRIVATE_ROOM_NAME).orElseThrow();
@@ -75,7 +75,8 @@ class DemoDataSeederIT {
 
         DialogView dialog = dialogService.getOrCreate(alice.getId(), bob.getId());
         List<MessageView> dmHistory = messageService
-                .historyForDialog(dialog.id(), alice.getId(), null, 100);
+                .historyForDialog(dialog.id(), alice.getId(), null, 100)
+                .items();
         assertThat(dmHistory).hasSizeGreaterThanOrEqualTo(3);
 
         List<FriendRequestView> carolOutgoing = friendService.list(carol.getId(), "outgoing");
@@ -99,12 +100,13 @@ class DemoDataSeederIT {
         User alice = userRepository.findByEmail(DemoDataSeeder.ALICE_EMAIL).orElseThrow();
         User bob = userRepository.findByEmail(DemoDataSeeder.BOB_EMAIL).orElseThrow();
         Room publicRoom = roomRepository.findByName(DemoDataSeeder.PUBLIC_ROOM_NAME).orElseThrow();
-        List<MessageView> roomHistory = messageService.history(publicRoom.getId(), alice.getId(), null, 100);
+        List<MessageView> roomHistory = messageService.history(publicRoom.getId(), alice.getId(), null, 100).items();
         assertThat(roomHistory).hasSize(5);
 
         DialogView dialog = dialogService.getOrCreate(alice.getId(), bob.getId());
         List<MessageView> dmHistory = messageService
-                .historyForDialog(dialog.id(), alice.getId(), null, 100);
+                .historyForDialog(dialog.id(), alice.getId(), null, 100)
+                .items();
         assertThat(dmHistory).hasSize(3);
     }
 }

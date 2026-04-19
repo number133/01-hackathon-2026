@@ -2,7 +2,7 @@
   <div *ngIf="loading()" class="muted small center">Loading…</div>
 
   <app-message-item
-    *ngFor="let m of messages()"
+    *ngFor="let m of messages(); trackBy: trackByMessage"
     [message]="m"
     [canEdit]="canEdit(m)"
     [canDelete]="canDelete(m)"

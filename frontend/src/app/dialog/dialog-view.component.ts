@@ -1,5 +1,13 @@
 import { CommonModule } from '@angular/common';
-import { Component, ViewChild, computed, effect, inject, signal } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  ViewChild,
+  computed,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 
@@ -30,6 +38,7 @@ import { DialogService, DialogView } from './dialog.service';
 })
 export class DialogViewComponent {
   @ViewChild(AttachmentPickerComponent) picker?: AttachmentPickerComponent;
+  @ViewChild('scroller', { static: false }) scroller?: ElementRef<HTMLDivElement>;
 
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -53,6 +62,10 @@ export class DialogViewComponent {
     const d = this.dialog();
     return d ? this.dialogs.state(d.id).messages : [];
   });
+  readonly loading = computed(() => {
+    const d = this.dialog();
+    return d ? this.dialogs.state(d.id).loading : false;
+  });
   readonly highestSeq = computed(() => {
     const d = this.dialog();
     return d ? this.dialogs.state(d.id).highestSeq : 0;
@@ -61,6 +74,8 @@ export class DialogViewComponent {
   private dialogId: string | null = null;
   private watchedCounterpart: string | null = null;
   private lastAckedSeq = 0;
+  private pinnedToBottom = true;
+  private loadMoreGuard = false;
 
   constructor() {
     effect(() => {
@@ -71,6 +86,13 @@ export class DialogViewComponent {
         this.unread.markRead(d.id, seq);
       }
     }, { allowSignalWrites: true });
+    effect(() => {
+      // Touch signals so the effect re-runs; only scroll if pinned.
+      this.messages();
+      this.highestSeq();
+      if (!this.pinnedToBottom) return;
+      requestAnimationFrame(() => this.scrollToBottom());
+    });
   }
 
   ngOnInit(): void {
@@ -98,6 +120,40 @@ export class DialogViewComponent {
     if (this.watchedCounterpart) this.presence.unwatch([this.watchedCounterpart]);
   }
 
+  trackByMessage(_index: number, m: MessageView): string {
+    return m.id;
+  }
+
+  onScroll(): void {
+    if (!this.scroller || !this.dialogId) return;
+    const el = this.scroller.nativeElement;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    this.pinnedToBottom = distanceFromBottom < 40;
+    if (el.scrollTop < 80 && !this.loadMoreGuard) {
+      this.loadMoreGuard = true;
+      const previousHeight = el.scrollHeight;
+      const id = this.dialogId;
+      this.dialogs.loadMore(id).subscribe({
+        next: () => {
+          this.loadMoreGuard = false;
+          if (this.scroller) {
+            const delta = this.scroller.nativeElement.scrollHeight - previousHeight;
+            this.scroller.nativeElement.scrollTop = delta;
+          }
+        },
+        error: () => {
+          this.loadMoreGuard = false;
+        },
+      });
+    }
+  }
+
+  private scrollToBottom(): void {
+    if (!this.scroller) return;
+    const el = this.scroller.nativeElement;
+    el.scrollTop = el.scrollHeight;
+  }
+
   onAttachmentsChange(ids: string[]): void {
     this.attachmentIds.set(ids);
   }
@@ -121,6 +177,7 @@ export class DialogViewComponent {
         this.picker?.clear();
         this.attachmentIds.set([]);
         this.replyingTo.set(null);
+        this.pinnedToBottom = true;
       },
       error: (err: unknown) => this.error.set(this.auth.errorText(err)),
     });

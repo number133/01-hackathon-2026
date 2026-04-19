@@ -4,6 +4,7 @@ import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
 import { Observable, tap } from 'rxjs';
 
 import { NotificationService } from '../core/notification/notification.service';
+import { HistoryResponse, MESSAGE_PAGE_SIZE } from './pagination';
 
 export interface MessageReplyRef {
   id: string;
@@ -150,7 +151,9 @@ export class ChatService {
       [roomId]: { ...(s[roomId] ?? EMPTY_STATE), loading: true },
     }));
     return this.http
-      .get<{ items: MessageView[]; pageSize: number }>(`/api/rooms/${roomId}/messages`)
+      .get<HistoryResponse<MessageView>>(
+        `/api/rooms/${roomId}/messages?limit=${MESSAGE_PAGE_SIZE}`,
+      )
       .pipe(
         tap((res) => {
           const messages = [...res.items].reverse();
@@ -161,7 +164,7 @@ export class ChatService {
               messages,
               highestSeq,
               loading: false,
-              endReached: res.items.length < 50,
+              endReached: !res.hasMore,
             },
           }));
         }),
@@ -170,14 +173,14 @@ export class ChatService {
 
   loadMore(roomId: string): Observable<MessageView[]> {
     const current = this.state(roomId);
-    if (current.endReached || current.messages.length === 0) {
+    if (current.endReached || current.messages.length === 0 || current.loading) {
       return new Observable((sub) => { sub.next([]); sub.complete(); });
     }
     const beforeSeq = current.messages[0].seq;
     this.rooms.update((s) => ({ ...s, [roomId]: { ...current, loading: true } }));
     return this.http
-      .get<{ items: MessageView[]; pageSize: number }>(
-        `/api/rooms/${roomId}/messages?beforeSeq=${beforeSeq}`,
+      .get<HistoryResponse<MessageView>>(
+        `/api/rooms/${roomId}/messages?beforeSeq=${beforeSeq}&limit=${MESSAGE_PAGE_SIZE}`,
       )
       .pipe(
         tap((res) => {
@@ -190,7 +193,7 @@ export class ChatService {
                 ...st,
                 messages: [...older, ...st.messages],
                 loading: false,
-                endReached: res.items.length < 50,
+                endReached: !res.hasMore,
               },
             };
           });

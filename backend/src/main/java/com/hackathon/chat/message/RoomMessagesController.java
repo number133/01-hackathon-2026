@@ -3,7 +3,6 @@ package com.hackathon.chat.message;
 import com.hackathon.chat.user.User;
 import com.hackathon.chat.user.UserService;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -40,8 +39,8 @@ public class RoomMessagesController {
     public Map<String, Object> history(@PathVariable UUID roomId,
                                        @RequestParam(required = false) Long beforeSeq,
                                        @RequestParam(required = false) Integer limit) {
-        List<MessageView> items = messageService.history(roomId, me().getId(), beforeSeq, limit);
-        return Map.of("items", items, "pageSize", items.size());
+        HistoryPage page = messageService.history(roomId, me().getId(), beforeSeq, limit);
+        return Map.of("items", page.items(), "hasMore", page.hasMore());
     }
 
     private User me() {

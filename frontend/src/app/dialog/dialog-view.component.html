@@ -16,15 +16,16 @@
 
     <div *ngIf="error() as msg" class="error">{{ msg }}</div>
 
-    <div class="messages">
+    <div class="message-scroller" #scroller (scroll)="onScroll()">
+      <div *ngIf="loading()" class="muted small center">Loading…</div>
       <app-message-item
-        *ngFor="let m of messages()"
+        *ngFor="let m of messages(); trackBy: trackByMessage"
         [message]="m"
         [canEdit]="canEdit(m)"
         [canDelete]="canDelete(m)"
         (reply)="onReply($event)">
       </app-message-item>
-      <div *ngIf="messages().length === 0" class="empty-state small">
+      <div *ngIf="messages().length === 0 && !loading()" class="empty-state small">
         No messages yet. Say hi!
       </div>
     </div>

@@ -177,6 +177,7 @@ public class DemoDataSeeder {
     private boolean hasMessages(UUID conversationId, User viewer) {
         return !messageService
                 .historyForDialog(conversationId, viewer.getId(), null, 1)
+                .items()
                 .isEmpty();
     }
 

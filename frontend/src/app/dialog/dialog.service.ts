@@ -3,6 +3,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 
 import { ChatService, MessageView } from '../chat/chat.service';
+import { HistoryResponse, MESSAGE_PAGE_SIZE } from '../chat/pagination';
 
 export interface DialogView {
   id: string;
@@ -66,7 +67,9 @@ export class DialogService {
       [id]: { ...(s[id] ?? EMPTY_STATE), loading: true },
     }));
     return this.http
-      .get<{ items: MessageView[]; pageSize: number }>(`/api/dialogs/${id}/messages`)
+      .get<HistoryResponse<MessageView>>(
+        `/api/dialogs/${id}/messages?limit=${MESSAGE_PAGE_SIZE}`,
+      )
       .pipe(
         tap((res) => {
           const messages = [...res.items].reverse();
@@ -78,9 +81,39 @@ export class DialogService {
               messages,
               highestSeq,
               loading: false,
-              endReached: res.items.length < 50,
+              endReached: !res.hasMore,
             },
           }));
+        }),
+      ) as unknown as Observable<MessageView[]>;
+  }
+
+  loadMore(id: string): Observable<MessageView[]> {
+    const current = this.state(id);
+    if (current.endReached || current.messages.length === 0 || current.loading) {
+      return new Observable((sub) => { sub.next([]); sub.complete(); });
+    }
+    const beforeSeq = current.messages[0].seq;
+    this.states.update((s) => ({ ...s, [id]: { ...current, loading: true } }));
+    return this.http
+      .get<HistoryResponse<MessageView>>(
+        `/api/dialogs/${id}/messages?beforeSeq=${beforeSeq}&limit=${MESSAGE_PAGE_SIZE}`,
+      )
+      .pipe(
+        tap((res) => {
+          const older = [...res.items].reverse();
+          this.states.update((s) => {
+            const st = s[id] ?? EMPTY_STATE;
+            return {
+              ...s,
+              [id]: {
+                ...st,
+                messages: [...older, ...st.messages],
+                loading: false,
+                endReached: !res.hasMore,
+              },
+            };
+          });
         }),
       ) as unknown as Observable<MessageView[]>;
   }
@@ -126,6 +159,11 @@ export class DialogService {
     const current = this.state(id);
     if (evt.event === 'message.created') {
       if (evt.seq <= current.highestSeq) return;
+      if (evt.seq > current.highestSeq + 1 && current.highestSeq > 0) {
+        // Gap detected — refetch tail to recover any missed messages.
+        this.loadInitial(id).subscribe();
+        return;
+      }
       this.states.update((s) => ({
         ...s,
         [id]: {

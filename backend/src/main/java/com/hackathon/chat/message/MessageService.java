@@ -34,8 +34,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class MessageService {
 
     public static final int BODY_MAX_BYTES = 3072;
-    private static final int DEFAULT_LIMIT = 50;
-    private static final int MAX_LIMIT = 100;
+    public static final int DEFAULT_PAGE_SIZE = 50;
+    public static final int MAX_PAGE_SIZE = 100;
     private static final int PREVIEW_LENGTH = 120;
 
     private final MessageRepository messageRepository;
@@ -182,32 +182,37 @@ public class MessageService {
     }
 
     @Transactional(readOnly = true)
-    public List<MessageView> historyForDialog(UUID conversationId, UUID userId,
-                                              Long beforeSeq, Integer limit) {
+    public HistoryPage historyForDialog(UUID conversationId, UUID userId,
+                                        Long beforeSeq, Integer limit) {
         dialogService.assertReadable(conversationId, userId);
-        int pageSize = limit == null ? DEFAULT_LIMIT : Math.min(Math.max(limit, 1), MAX_LIMIT);
-        List<Message> rows;
-        if (beforeSeq == null) {
-            rows = messageRepository.findLatest(conversationId, PageRequest.of(0, pageSize));
-        } else {
-            rows = messageRepository.findHistory(conversationId, beforeSeq, PageRequest.of(0, pageSize));
-        }
-        return toViews(rows, null);
+        int pageSize = resolvePageSize(limit);
+        List<Message> rows = fetchRows(conversationId, beforeSeq, pageSize);
+        boolean hasMore = rows.size() > pageSize;
+        if (hasMore) rows = rows.subList(0, pageSize);
+        return new HistoryPage(toViews(rows, null), hasMore);
     }
 
     @Transactional(readOnly = true)
-    public List<MessageView> history(UUID roomId, UUID userId, Long beforeSeq, Integer limit) {
+    public HistoryPage history(UUID roomId, UUID userId, Long beforeSeq, Integer limit) {
         roomService.requireMember(roomId, userId);
         Room room = roomService.requireRoom(roomId);
-        int pageSize = limit == null ? DEFAULT_LIMIT : Math.min(Math.max(limit, 1), MAX_LIMIT);
-        List<Message> rows;
-        if (beforeSeq == null) {
-            rows = messageRepository.findLatest(room.getConversationId(), PageRequest.of(0, pageSize));
-        } else {
-            rows = messageRepository.findHistory(
-                    room.getConversationId(), beforeSeq, PageRequest.of(0, pageSize));
-        }
-        return toViews(rows, room);
+        int pageSize = resolvePageSize(limit);
+        List<Message> rows = fetchRows(room.getConversationId(), beforeSeq, pageSize);
+        boolean hasMore = rows.size() > pageSize;
+        if (hasMore) rows = rows.subList(0, pageSize);
+        return new HistoryPage(toViews(rows, room), hasMore);
+    }
+
+    private int resolvePageSize(Integer limit) {
+        return limit == null ? DEFAULT_PAGE_SIZE : Math.min(Math.max(limit, 1), MAX_PAGE_SIZE);
+    }
+
+    private List<Message> fetchRows(UUID conversationId, Long beforeSeq, int pageSize) {
+        // Ask for one extra row to detect whether older history remains.
+        PageRequest page = PageRequest.of(0, pageSize + 1);
+        return beforeSeq == null
+                ? messageRepository.findLatest(conversationId, page)
+                : messageRepository.findHistory(conversationId, beforeSeq, page);
     }
 
     private Message requireMessage(UUID messageId) {

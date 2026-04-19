@@ -1,6 +1,5 @@
 import { CommonModule } from '@angular/common';
 import {
-  AfterViewChecked,
   Component,
   ElementRef,
   Input,
@@ -24,7 +23,7 @@ import { MessageItemComponent } from './message-item.component';
   imports: [CommonModule, MessageItemComponent],
   templateUrl: './message-list.component.html',
 })
-export class MessageListComponent implements OnChanges, OnDestroy, AfterViewChecked {
+export class MessageListComponent implements OnChanges, OnDestroy {
   @Input({ required: true }) roomId!: string;
   @Input({ required: true }) conversationId!: string;
   @Input() myUserId: string | null = null;
@@ -52,6 +51,13 @@ export class MessageListComponent implements OnChanges, OnDestroy, AfterViewChec
         this.unread.markRead(this.conversationId, seq);
       }
     }, { allowSignalWrites: true });
+    effect(() => {
+      // Re-run whenever the message list changes; scroll only if user is pinned to bottom.
+      this.messages();
+      this.highestSeq();
+      if (!this.pinnedToBottom) return;
+      requestAnimationFrame(() => this.scrollToBottom());
+    });
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -77,12 +83,14 @@ export class MessageListComponent implements OnChanges, OnDestroy, AfterViewChec
     }
   }
 
-  ngAfterViewChecked(): void {
+  private scrollToBottom(): void {
     if (!this.scroller) return;
-    if (this.pinnedToBottom) {
-      const el = this.scroller.nativeElement;
-      el.scrollTop = el.scrollHeight;
-    }
+    const el = this.scroller.nativeElement;
+    el.scrollTop = el.scrollHeight;
+  }
+
+  trackByMessage(_index: number, m: MessageView): string {
+    return m.id;
   }
 
   onScroll(): void {
