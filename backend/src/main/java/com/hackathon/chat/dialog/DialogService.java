@@ -8,6 +8,7 @@ import com.hackathon.chat.conversation.Conversation;
 import com.hackathon.chat.conversation.ConversationService;
 import com.hackathon.chat.message.Message;
 import com.hackathon.chat.message.MessageRepository;
+import com.hackathon.chat.unread.UnreadService;
 import com.hackathon.chat.user.User;
 import com.hackathon.chat.user.UserRepository;
 import java.util.ArrayList;
@@ -18,6 +19,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,17 +33,20 @@ public class DialogService {
     private final FriendService friendService;
     private final UserRepository userRepository;
     private final MessageRepository messageRepository;
+    private final UnreadService unreadService;
 
     public DialogService(DialogRepository dialogRepository,
                          ConversationService conversationService,
                          FriendService friendService,
                          UserRepository userRepository,
-                         MessageRepository messageRepository) {
+                         MessageRepository messageRepository,
+                         @Lazy UnreadService unreadService) {
         this.dialogRepository = dialogRepository;
         this.conversationService = conversationService;
         this.friendService = friendService;
         this.userRepository = userRepository;
         this.messageRepository = messageRepository;
+        this.unreadService = unreadService;
     }
 
     public DialogView getOrCreate(UUID callerId, UUID counterpartId) {
@@ -63,7 +68,10 @@ public class DialogService {
     private Dialog createFresh(OrderedPair pair) {
         Conversation conv = conversationService.create(Conversation.TYPE_DIALOG);
         try {
-            return dialogRepository.save(new Dialog(conv.getId(), pair.low(), pair.high()));
+            Dialog saved = dialogRepository.save(new Dialog(conv.getId(), pair.low(), pair.high()));
+            unreadService.initMarker(pair.low(), conv.getId(), 0L);
+            unreadService.initMarker(pair.high(), conv.getId(), 0L);
+            return saved;
         } catch (DataIntegrityViolationException race) {
             // Concurrent create won — drop the stray conversation and read the winner.
             conversationService.deleteConversation(conv.getId());

@@ -3,12 +3,14 @@ package com.hackathon.chat.invitation;
 import com.hackathon.chat.common.AccountConflictException;
 import com.hackathon.chat.common.DuplicateResourceException;
 import com.hackathon.chat.common.ForbiddenException;
+import com.hackathon.chat.conversation.ConversationService;
 import com.hackathon.chat.room.Room;
 import com.hackathon.chat.room.RoomBanRepository;
 import com.hackathon.chat.room.RoomMember;
 import com.hackathon.chat.room.RoomMemberRepository;
 import com.hackathon.chat.room.RoomRepository;
 import com.hackathon.chat.room.RoomService;
+import com.hackathon.chat.unread.UnreadService;
 import com.hackathon.chat.user.User;
 import com.hackathon.chat.user.UserRepository;
 import java.util.ArrayList;
@@ -18,6 +20,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.UUID;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,18 +34,24 @@ public class InvitationService {
     private final RoomBanRepository banRepository;
     private final UserRepository userRepository;
     private final RoomService roomService;
+    private final ConversationService conversationService;
+    private final UnreadService unreadService;
 
     public InvitationService(RoomInvitationRepository invitationRepository,
                              RoomRepository roomRepository,
                              RoomMemberRepository memberRepository,
                              RoomBanRepository banRepository,
                              UserRepository userRepository,
-                             RoomService roomService) {
+                             RoomService roomService,
+                             ConversationService conversationService,
+                             @Lazy UnreadService unreadService) {
         this.invitationRepository = invitationRepository;
         this.roomRepository = roomRepository;
         this.memberRepository = memberRepository;
         this.banRepository = banRepository;
         this.userRepository = userRepository;
+        this.conversationService = conversationService;
+        this.unreadService = unreadService;
         this.roomService = roomService;
     }
 
@@ -91,6 +100,12 @@ public class InvitationService {
         }
         if (!memberRepository.existsByRoomIdAndUserId(invite.getRoomId(), userId)) {
             memberRepository.save(new RoomMember(invite.getRoomId(), userId, RoomMember.ROLE_MEMBER));
+            roomRepository.findById(invite.getRoomId())
+                    .map(Room::getConversationId)
+                    .ifPresent(convId -> {
+                        long lastSeq = conversationService.require(convId).getLastSeq();
+                        unreadService.initMarker(userId, convId, lastSeq);
+                    });
         }
         invite.markAccepted();
     }

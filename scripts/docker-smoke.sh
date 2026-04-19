@@ -333,6 +333,86 @@ call POST "/api/rooms/$ROOM_ID/messages" --jar "$ALICE_JAR" --expect 400 \
   --body '{}' >/dev/null
 green "  empty message rejected 400"
 
+# ───────────────────────── phase 7: unread / watermarks ────────────────
+
+step "Phase 7 — unread watermark bumps + mark-read"
+
+# Fresh room so we have a known seq baseline.
+UNREAD_ROOM="$(call POST /api/rooms --jar "$ALICE_JAR" --expect 201 \
+  --body "{\"name\":\"unread-${TS}\",\"description\":\"\",\"visibility\":\"public\"}")"
+UNREAD_ROOM_ID="$(json_field "$UNREAD_ROOM" "['id']")"
+UNREAD_CONV_ID="$(json_field "$UNREAD_ROOM" "['conversationId']")"
+
+call POST "/api/rooms/$UNREAD_ROOM_ID/join" --jar "$BOB_JAR" --expect 204 >/dev/null
+
+# Baseline: Bob's unread snapshot shows 0 for this conversation (just joined).
+BOB_UNREAD="$(call GET /api/unread --jar "$BOB_JAR")"
+BASELINE="$(python3 -c "import sys,json
+d=json.loads(sys.stdin.read())
+for v in d:
+  if v['conversationId']=='$UNREAD_CONV_ID':
+    print(v['count']); break
+else:
+  print(0)" <<<"$BOB_UNREAD")"
+[[ "$BASELINE" == "0" ]] || fail "bob should start at 0 unread in fresh room: $BOB_UNREAD"
+
+# Alice posts two messages; Bob's unread should become 2.
+POST1="$(call POST "/api/rooms/$UNREAD_ROOM_ID/messages" --jar "$ALICE_JAR" --expect 201 \
+  --body '{"text":"u1"}')"
+SEQ_POST1="$(json_field "$POST1" "['seq']")"
+call POST "/api/rooms/$UNREAD_ROOM_ID/messages" --jar "$ALICE_JAR" --expect 201 \
+  --body '{"text":"u2"}' >/dev/null
+
+BOB_UNREAD="$(call GET /api/unread --jar "$BOB_JAR")"
+COUNT_BOB="$(python3 -c "import sys,json
+d=json.loads(sys.stdin.read())
+for v in d:
+  if v['conversationId']=='$UNREAD_CONV_ID':
+    print(v['count']); break
+else:
+  print(0)" <<<"$BOB_UNREAD")"
+[[ "$COUNT_BOB" == "2" ]] || fail "bob should have 2 unread after two posts: $BOB_UNREAD"
+
+# Alice (the author) should NOT accumulate unread for her own posts.
+ALICE_UNREAD="$(call GET /api/unread --jar "$ALICE_JAR")"
+COUNT_ALICE="$(python3 -c "import sys,json
+d=json.loads(sys.stdin.read())
+for v in d:
+  if v['conversationId']=='$UNREAD_CONV_ID':
+    print(v['count']); break
+else:
+  print(0)" <<<"$ALICE_UNREAD")"
+[[ "$COUNT_ALICE" == "0" ]] || fail "author should not have self-unread: $ALICE_UNREAD"
+
+# Bob marks read at the latest seq; count must drop to 0.
+LATEST_SEQ="$((SEQ_POST1 + 1))"
+call POST "/api/conversations/$UNREAD_CONV_ID/read" --jar "$BOB_JAR" --expect 204 \
+  --body "{\"seq\":$LATEST_SEQ}" >/dev/null
+
+BOB_UNREAD="$(call GET /api/unread --jar "$BOB_JAR")"
+COUNT_AFTER="$(python3 -c "import sys,json
+d=json.loads(sys.stdin.read())
+for v in d:
+  if v['conversationId']=='$UNREAD_CONV_ID':
+    print(v['count']); break
+else:
+  print(0)" <<<"$BOB_UNREAD")"
+[[ "$COUNT_AFTER" == "0" ]] || fail "bob should be caught up after mark-read: $BOB_UNREAD"
+
+# Non-participant cannot mark read (carol has no membership in this room).
+CAROL_EMAIL="smoke-carol-${TS}@example.com"
+CAROL_USER="smokec${TS}"
+CAROL_JAR="$(mktemp)"
+seed_csrf "$CAROL_JAR"
+call POST /api/auth/register --jar "$CAROL_JAR" \
+  --body "{\"email\":\"$CAROL_EMAIL\",\"username\":\"$CAROL_USER\",\"password\":\"$PASSWORD\"}" \
+  >/dev/null
+call POST "/api/conversations/$UNREAD_CONV_ID/read" --jar "$CAROL_JAR" --expect 403 \
+  --body '{"seq":1}' >/dev/null
+rm -f "$CAROL_JAR"
+
+green "  unread: post→2, author→0, mark-read→0, non-participant→403"
+
 # ───────────────────────── static assets ─────────────────────────────────
 
 step "Static — SPA fallback and Angular bundle"
@@ -348,4 +428,4 @@ green "  SPA fallback serves index.html for /rooms/<id>"
 # ───────────────────────── done ──────────────────────────────────────────
 
 green ""
-green "All docker smoke checks passed (phases 0, 1, 2, 3, 3.1, 4, 5, 6)."
+green "All docker smoke checks passed (phases 0, 1, 2, 3, 3.1, 4, 5, 6, 7)."

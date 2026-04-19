@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, ViewChild, computed, inject, signal } from '@angular/core';
+import { Component, ViewChild, computed, effect, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 
@@ -9,6 +9,7 @@ import { AuthService } from '../auth/auth.service';
 import { ChatService } from '../chat/chat.service';
 import { PresenceDotComponent } from '../presence/presence-dot.component';
 import { PresenceService } from '../presence/presence.service';
+import { UnreadService } from '../unread/unread.service';
 import { DialogService, DialogView } from './dialog.service';
 
 @Component({
@@ -32,6 +33,7 @@ export class DialogViewComponent {
   private readonly chat = inject(ChatService);
   private readonly auth = inject(AuthService);
   private readonly presence = inject(PresenceService);
+  private readonly unread = inject(UnreadService);
 
   readonly dialog = signal<DialogView | null>(null);
   readonly error = signal<string | null>(null);
@@ -45,9 +47,25 @@ export class DialogViewComponent {
     const d = this.dialog();
     return d ? this.dialogs.state(d.id).messages : [];
   });
+  readonly highestSeq = computed(() => {
+    const d = this.dialog();
+    return d ? this.dialogs.state(d.id).highestSeq : 0;
+  });
 
   private dialogId: string | null = null;
   private watchedCounterpart: string | null = null;
+  private lastAckedSeq = 0;
+
+  constructor() {
+    effect(() => {
+      const seq = this.highestSeq();
+      const d = this.dialog();
+      if (d && seq > 0 && seq > this.lastAckedSeq) {
+        this.lastAckedSeq = seq;
+        this.unread.markRead(d.id, seq);
+      }
+    });
+  }
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');

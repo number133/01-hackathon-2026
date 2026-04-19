@@ -5,6 +5,7 @@ import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../auth/auth.service';
 import { FriendService } from '../contacts/friend.service';
 import { InvitationService } from '../rooms/invitation.service';
+import { UnreadService } from '../unread/unread.service';
 
 @Component({
   selector: 'app-top-menu',
@@ -17,10 +18,12 @@ export class TopMenuComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly invitations = inject(InvitationService);
   private readonly friends = inject(FriendService);
+  private readonly unread = inject(UnreadService);
 
   readonly user = this.auth.user;
   readonly pendingInvites = this.invitations.pendingCount;
   readonly pendingFriendRequests = this.friends.incomingPendingCount;
+  readonly totalUnread = this.unread.total;
 
   constructor() {
     effect(() => {

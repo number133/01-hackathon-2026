@@ -5,18 +5,21 @@ import { RouterLink } from '@angular/router';
 import { AuthService } from '../auth/auth.service';
 import { PresenceDotComponent } from '../presence/presence-dot.component';
 import { PresenceService } from '../presence/presence.service';
+import { UnreadBadgeComponent } from '../unread/unread-badge.component';
+import { UnreadService } from '../unread/unread.service';
 import { DialogService, DialogView } from './dialog.service';
 
 @Component({
   selector: 'app-dialogs-catalog',
   standalone: true,
-  imports: [CommonModule, RouterLink, PresenceDotComponent],
+  imports: [CommonModule, RouterLink, PresenceDotComponent, UnreadBadgeComponent],
   templateUrl: './dialogs-catalog.component.html',
 })
 export class DialogsCatalogComponent {
   private readonly dialogs = inject(DialogService);
   private readonly auth = inject(AuthService);
   private readonly presence = inject(PresenceService);
+  readonly unread = inject(UnreadService);
 
   readonly items = signal<DialogView[]>([]);
   readonly error = signal<string | null>(null);

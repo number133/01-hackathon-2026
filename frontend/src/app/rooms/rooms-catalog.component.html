@@ -16,6 +16,7 @@
       <div class="row between">
         <div>
           <a [routerLink]="['/rooms', room.id]"><strong>{{ room.name }}</strong></a>
+          <app-unread-badge *ngIf="room.myRole" [count]="unread.countFor(room.conversationId)"></app-unread-badge>
           <span class="muted"> · {{ room.memberCount }} member{{ room.memberCount === 1 ? '' : 's' }}</span>
           <p class="muted" *ngIf="room.description">{{ room.description }}</p>
         </div>

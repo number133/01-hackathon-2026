@@ -2,6 +2,8 @@ package com.hackathon.chat.room;
 
 import com.hackathon.chat.common.AccountConflictException;
 import com.hackathon.chat.common.ForbiddenException;
+import com.hackathon.chat.conversation.ConversationService;
+import com.hackathon.chat.unread.UnreadService;
 import com.hackathon.chat.user.User;
 import com.hackathon.chat.user.UserRepository;
 import java.util.ArrayList;
@@ -10,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,17 +25,23 @@ public class RoomMembershipService {
     private final RoomMemberRepository memberRepository;
     private final RoomBanRepository banRepository;
     private final UserRepository userRepository;
+    private final ConversationService conversationService;
+    private final UnreadService unreadService;
 
     public RoomMembershipService(RoomService roomService,
                                  RoomRepository roomRepository,
                                  RoomMemberRepository memberRepository,
                                  RoomBanRepository banRepository,
-                                 UserRepository userRepository) {
+                                 UserRepository userRepository,
+                                 ConversationService conversationService,
+                                 @Lazy UnreadService unreadService) {
         this.roomService = roomService;
         this.roomRepository = roomRepository;
         this.memberRepository = memberRepository;
         this.banRepository = banRepository;
         this.userRepository = userRepository;
+        this.conversationService = conversationService;
+        this.unreadService = unreadService;
     }
 
     public void join(UUID roomId, UUID userId) {
@@ -47,6 +56,10 @@ public class RoomMembershipService {
             throw new AccountConflictException("Already a member");
         }
         memberRepository.save(new RoomMember(roomId, userId, RoomMember.ROLE_MEMBER));
+        if (unreadService != null && room.getConversationId() != null) {
+            long lastSeq = conversationService.require(room.getConversationId()).getLastSeq();
+            unreadService.initMarker(userId, room.getConversationId(), lastSeq);
+        }
     }
 
     public void leave(UUID roomId, UUID userId) {

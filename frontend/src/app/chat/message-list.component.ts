@@ -8,10 +8,12 @@ import {
   OnInit,
   ViewChild,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
 
+import { UnreadService } from '../unread/unread.service';
 import { ChatService, MessageView } from './chat.service';
 import { MessageItemComponent } from './message-item.component';
 
@@ -23,18 +25,32 @@ import { MessageItemComponent } from './message-item.component';
 })
 export class MessageListComponent implements OnInit, OnDestroy, AfterViewChecked {
   @Input({ required: true }) roomId!: string;
+  @Input({ required: true }) conversationId!: string;
   @Input() myUserId: string | null = null;
   @Input() myRole: string | null = null;
 
   @ViewChild('scroller', { static: false }) scroller?: ElementRef<HTMLDivElement>;
 
   private readonly chat = inject(ChatService);
+  private readonly unread = inject(UnreadService);
   private pinnedToBottom = true;
   private loadMoreGuard = false;
+  private lastAckedSeq = 0;
 
   readonly messages = computed(() => this.chat.state(this.roomId).messages);
   readonly loading = computed(() => this.chat.state(this.roomId).loading);
+  readonly highestSeq = computed(() => this.chat.state(this.roomId).highestSeq);
   readonly replyingTo = signal<MessageView | null>(null);
+
+  constructor() {
+    effect(() => {
+      const seq = this.highestSeq();
+      if (seq > 0 && seq > this.lastAckedSeq && this.conversationId) {
+        this.lastAckedSeq = seq;
+        this.unread.markRead(this.conversationId, seq);
+      }
+    });
+  }
 
   ngOnInit(): void {
     this.chat.connect();

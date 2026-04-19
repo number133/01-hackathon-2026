@@ -7,6 +7,7 @@ import { ChatService } from './chat/chat.service';
 import { FriendService } from './contacts/friend.service';
 import { TopMenuComponent } from './layout/top-menu.component';
 import { PresenceService } from './presence/presence.service';
+import { UnreadService } from './unread/unread.service';
 
 @Component({
   selector: 'app-root',
@@ -19,6 +20,7 @@ export class AppComponent {
   private readonly presence = inject(PresenceService);
   private readonly chat = inject(ChatService);
   private readonly friends = inject(FriendService);
+  private readonly unread = inject(UnreadService);
 
   readonly ready = this.auth.ready;
 
@@ -28,6 +30,7 @@ export class AppComponent {
         this.chat.connect();
         this.presence.start();
         this.friends.start();
+        this.unread.start();
       }
     });
   }

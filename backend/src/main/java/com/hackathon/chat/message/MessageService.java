@@ -11,6 +11,7 @@ import com.hackathon.chat.dialog.DialogService;
 import com.hackathon.chat.room.Room;
 import com.hackathon.chat.room.RoomRepository;
 import com.hackathon.chat.room.RoomService;
+import com.hackathon.chat.unread.UnreadService;
 import com.hackathon.chat.user.User;
 import com.hackathon.chat.user.UserRepository;
 import com.hackathon.chat.ws.MessageBroadcaster;
@@ -44,6 +45,7 @@ public class MessageService {
     private final ConversationService conversationService;
     private final DialogService dialogService;
     private final AttachmentService attachmentService;
+    private final UnreadService unreadService;
     private final MessageBroadcaster broadcaster;
 
     public MessageService(MessageRepository messageRepository,
@@ -53,6 +55,7 @@ public class MessageService {
                           ConversationService conversationService,
                           DialogService dialogService,
                           AttachmentService attachmentService,
+                          UnreadService unreadService,
                           MessageBroadcaster broadcaster) {
         this.messageRepository = messageRepository;
         this.roomRepository = roomRepository;
@@ -61,6 +64,7 @@ public class MessageService {
         this.conversationService = conversationService;
         this.dialogService = dialogService;
         this.attachmentService = attachmentService;
+        this.unreadService = unreadService;
         this.broadcaster = broadcaster;
     }
 
@@ -80,6 +84,7 @@ public class MessageService {
         Message saved = messageRepository.save(
                 new Message(conversationId, seq, userId, request.hasText() ? request.text() : "", request.replyToId()));
         attachmentService.linkToMessage(request.attachmentIds(), conversationId, userId, saved.getId());
+        unreadService.bumpForMessage(conversationId, userId, seq);
         MessageView view = toView(saved, room);
         broadcaster.publish(WsEventEnvelope.EVENT_CREATED, roomId, view);
         return view;
@@ -160,6 +165,7 @@ public class MessageService {
         Message saved = messageRepository.save(
                 new Message(conversationId, seq, userId, request.hasText() ? request.text() : "", request.replyToId()));
         attachmentService.linkToMessage(request.attachmentIds(), conversationId, userId, saved.getId());
+        unreadService.bumpForMessage(conversationId, userId, seq);
         MessageView view = toView(saved, null);
         broadcaster.publishToDialog(WsEventEnvelope.EVENT_CREATED, conversationId, view);
         return view;

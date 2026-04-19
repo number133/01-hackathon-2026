@@ -41,7 +41,9 @@ class InvitationServiceTest {
         banRepo = Mockito.mock(RoomBanRepository.class);
         userRepo = Mockito.mock(UserRepository.class);
         roomService = Mockito.mock(RoomService.class);
-        service = new InvitationService(invitationRepo, roomRepo, memberRepo, banRepo, userRepo, roomService);
+        service = new InvitationService(invitationRepo, roomRepo, memberRepo, banRepo, userRepo, roomService,
+                Mockito.mock(com.hackathon.chat.conversation.ConversationService.class),
+                Mockito.mock(com.hackathon.chat.unread.UnreadService.class));
     }
 
     @Test

@@ -16,7 +16,7 @@ plans live under `howto/tasks/` (globally git-ignored on the dev machines).
 | 4     | Presence                                          | Done         | 2026-04-18  |
 | 5     | Contacts, friend requests, bans, personal chats   | Done         | 2026-04-18  |
 | 6     | Attachments                                       | Done         | 2026-04-18  |
-| 7     | Notifications and unread state                    | Not started  | —           |
+| 7     | Notifications and unread state                    | Done         | 2026-04-19  |
 | 8     | Admin UI polish                                   | Not started  | —           |
 | 9     | End-to-end hardening for the demo                 | Not started  | —           |
 | 10    | Stretch: Jabber / XMPP federation                 | Not started  | —           |
@@ -665,7 +665,107 @@ conversation uses (spec §2.6).
 
 ---
 
+## Phase 7 — Notifications and unread state (done, 2026-04-19)
+
+Goal: every conversation (room or dialog) shows a live unread count per
+viewer, derived from a watermark `last_read_seq` per
+(user, conversation). Author never accumulates self-unread, counts update
+without a refresh, and a read on one tab zeroes the badge on every tab.
+
+### Delivered
+
+- **V8 migration** — `unread_marker(user_id, conversation_id,
+  last_read_seq, updated_at)` with composite PK + `idx_unread_marker_user`.
+  Three backfill inserts seed markers at `conversation.last_seq` for every
+  `room_member` and both sides of every `dialog`, so existing users don't
+  wake up to "everything unread" on the first post-migration deploy.
+- **`UnreadMarker` / `UnreadMarkerId` / `UnreadRepository`** — JPA entity
+  with `@IdClass`, two query methods (`findAllForUserIn`,
+  `findAllForUserInConversation`) used by the bump path to avoid
+  per-participant SELECTs.
+- **`ConversationParticipantsQuery`** — tiny read-only helper; given a
+  conversation id, returns `Set<UUID>` of participants by branching on
+  `conversation.type` (room → `room_member.user_id`; dialog → `user_a_id`
+  + `user_b_id`). Keeps `UnreadService` free of the
+  room-vs-dialog concern.
+- **`UnreadService`** — `initMarker(user, conv, atSeq)` idempotent upsert
+  (catches `DataIntegrityViolationException` on concurrent calls),
+  `bumpForMessage(conv, authorId, newSeq)` advances the author's marker
+  to `newSeq` (no self-unread) and emits `unread.updated` with the
+  derived count to every other participant via
+  `UserEventPublisher` afterCommit, `markRead` clamps to
+  `min(seq, conversation.last_seq)` and applies
+  `max(existing, clamped)` so a late or replayed payload can never
+  rewind the watermark, and `snapshot(userId)` returns one `UnreadView`
+  per membership (rooms + dialogs).
+- **Integration hooks** — `MessageService.post` and `postToDialog` call
+  `unreadService.bumpForMessage` inside the same transaction as the
+  message save, after the attachment link. `RoomService.create` /
+  `RoomMembershipService.join` / `InvitationService.accept` /
+  `DialogService.createFresh` all call `initMarker` at the current
+  `last_seq` so a fresh participant never sees pre-existing history as
+  unread. `@Lazy UnreadService` on the three room/dialog services to
+  keep the MessageService → Unread → UserEventPublisher → Interceptor
+  → DialogService cycle untangled.
+- **REST** — `GET /api/unread` returns `[{conversationId, count}]` for
+  the caller; `POST /api/conversations/{id}/read` with body `{seq}`
+  returns 204. Non-participants get 403 on mark-read.
+- **Frontend** — `UnreadService` signal (`countsMap`,
+  computed `total`) subscribed to `/topic/users/{me}` for
+  `unread.updated` events; `refresh()` hydrates from `GET /api/unread`
+  on start. `UnreadBadgeComponent` renders the pill ("99+" cap).
+  Rooms catalog + dialogs catalog render the badge next to each row;
+  top-menu renders the total next to "Rooms". Message-list and
+  dialog-view components watch the conversation's `highestSeq` signal
+  with an `effect` and fire a fire-and-forget `markRead` whenever it
+  advances; the per-tab `lastAckedSeq` guard collapses repeated
+  triggers in the same frame, and the server enforces the clamp.
+- **Smoke script** — Phase 7 block: fresh room, baseline 0 for Bob,
+  two posts from Alice → Bob shows 2 / Alice shows 0 / mark-read
+  collapses Bob back to 0, plus a non-participant Carol → 403.
+
+### Verification
+
+- `./gradlew test` — full suite green including `UnreadFlowIT`
+  (7 cases: baseline, bump, author-no-self-bump, multiple bumps,
+  clamp-at-last-seq, monotonic mark-read, non-participant 403) and
+  updated service-unit tests for Room/Membership/Invitation/Dialog
+  with the `@Lazy` `UnreadService` mock wiring.
+- `scripts/docker-smoke.sh` — nine phase blocks green on a clean
+  rebuild.
+
+### Known tradeoffs carried forward
+
+- **Derived counts, not stored.** The badge value is
+  `conversation.last_seq - unread_marker.last_read_seq`, recomputed on
+  each snapshot / bump instead of stored in a counter column. Keeps
+  the write path a single marker upsert and sidesteps the
+  increment-vs-rollback race that a `unread_count` column invites; at
+  the cost of O(participants) per message for the fanout, which is
+  fine at the 300-user scale.
+- **`@Lazy UnreadService` on four collaborators.** Same rationale as
+  Phase 5/6's `@Lazy`s — breaks the construction-order cycle without
+  splitting services. Proxy overhead is one virtual call per
+  `initMarker` / `bumpForMessage`. Alternative: move the
+  snapshot/mark-read path into a separate `UnreadQueryService` that
+  has no downstream deps, or extract the event fanout to a listener
+  that subscribes to domain events. Not worth it at hackathon scale.
+- **One `unread.updated` frame per non-author participant per
+  message.** At a 300-member room, that's up to 299 broadcast
+  publishes per post — all fire within the message
+  transaction's afterCommit. Cheap for STOMP but worth denormalising
+  (single fanout + client-side delta) if room sizes ever exceed the
+  spec's 300 cap.
+- **No catch-up on reconnect.** `UnreadService.start()` issues one
+  `GET /api/unread` on sign-in; WS events refine it from there. A
+  dropped connection's missed frames are re-absorbed on the next
+  message or on explicit refresh. A `window.focus` rehydrate would
+  close the gap if it ever becomes user-visible.
+
+---
+
 ## Next
 
-Phase 7 — notifications and unread state (per-user-per-conversation
-`last_read_seq` marker, live unread-bump events, UI badges).
+Phase 8 — admin UI polish (modal overlays replacing the inline tabbed
+room-management panel, block-from-room-members context action,
+admin-only room destroy confirmation UX).

@@ -32,7 +32,9 @@ class RoomMembershipServiceTest {
         memberRepo = Mockito.mock(RoomMemberRepository.class);
         banRepo = Mockito.mock(RoomBanRepository.class);
         userRepo = Mockito.mock(UserRepository.class);
-        service = new RoomMembershipService(roomService, roomRepo, memberRepo, banRepo, userRepo);
+        service = new RoomMembershipService(roomService, roomRepo, memberRepo, banRepo, userRepo,
+                Mockito.mock(com.hackathon.chat.conversation.ConversationService.class),
+                Mockito.mock(com.hackathon.chat.unread.UnreadService.class));
     }
 
     @Test

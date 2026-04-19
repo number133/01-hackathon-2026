@@ -5,6 +5,7 @@ import com.hackathon.chat.common.DuplicateResourceException;
 import com.hackathon.chat.common.ForbiddenException;
 import com.hackathon.chat.conversation.Conversation;
 import com.hackathon.chat.conversation.ConversationService;
+import com.hackathon.chat.unread.UnreadService;
 import com.hackathon.chat.user.User;
 import com.hackathon.chat.user.UserRepository;
 import java.util.ArrayList;
@@ -29,17 +30,20 @@ public class RoomService {
     private final UserRepository userRepository;
     private final ConversationService conversationService;
     private final AttachmentService attachmentService;
+    private final UnreadService unreadService;
 
     public RoomService(RoomRepository roomRepository,
                        RoomMemberRepository memberRepository,
                        UserRepository userRepository,
                        ConversationService conversationService,
-                       @Lazy AttachmentService attachmentService) {
+                       @Lazy AttachmentService attachmentService,
+                       @Lazy UnreadService unreadService) {
         this.roomRepository = roomRepository;
         this.memberRepository = memberRepository;
         this.userRepository = userRepository;
         this.conversationService = conversationService;
         this.attachmentService = attachmentService;
+        this.unreadService = unreadService;
     }
 
     public Room create(UUID ownerId, CreateRoomRequest request) {
@@ -53,6 +57,7 @@ public class RoomService {
         try {
             Room saved = roomRepository.saveAndFlush(room);
             memberRepository.save(new RoomMember(saved.getId(), ownerId, RoomMember.ROLE_OWNER));
+            unreadService.initMarker(ownerId, conversation.getId(), 0L);
             return saved;
         } catch (DataIntegrityViolationException ex) {
             throw new DuplicateResourceException("name", "Room name already taken");

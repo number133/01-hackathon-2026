@@ -57,7 +57,8 @@ class MessageServiceTest {
         attachmentService = Mockito.mock(com.hackathon.chat.attachment.AttachmentService.class);
         broadcaster = Mockito.mock(MessageBroadcaster.class);
         service = new MessageService(messageRepo, roomRepo, userRepo,
-                roomService, conversationService, dialogService, attachmentService, broadcaster);
+                roomService, conversationService, dialogService, attachmentService,
+                Mockito.mock(com.hackathon.chat.unread.UnreadService.class), broadcaster);
         when(attachmentService.refsByMessage(any())).thenReturn(java.util.Map.of());
 
         conversationId = UUID.randomUUID();

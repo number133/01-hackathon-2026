@@ -5,18 +5,21 @@ import { Router, RouterLink } from '@angular/router';
 import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs';
 
 import { AuthService } from '../auth/auth.service';
+import { UnreadBadgeComponent } from '../unread/unread-badge.component';
+import { UnreadService } from '../unread/unread.service';
 import { RoomService, RoomView } from './room.service';
 
 @Component({
   selector: 'app-rooms-catalog',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink, UnreadBadgeComponent],
   templateUrl: './rooms-catalog.component.html',
 })
 export class RoomsCatalogComponent implements OnInit {
   private readonly roomService = inject(RoomService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  readonly unread = inject(UnreadService);
 
   readonly search = new FormControl<string>('', { nonNullable: true });
   readonly rooms = signal<RoomView[]>([]);

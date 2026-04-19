@@ -11,6 +11,7 @@
         <app-presence-dot [userId]="d.counterpartId"></app-presence-dot>
         {{ d.counterpartUsername }}
       </a>
+      <app-unread-badge [count]="unread.countFor(d.id)"></app-unread-badge>
       <span *ngIf="d.frozen" class="muted">(frozen)</span>
     </li>
   </ul>
