@@ -206,3 +206,10 @@ See `CLAUDE.md` for the conventions we follow in this repo. Short version:
 - Prefer meaningful names to comments.
 - Never guess database object names — verify against migrations and code.
 - No JWT. Session cookies only.
+
+## How Claude was used on this project
+
+Nearly every line under `backend/`, `frontend/`, and `frontend/e2e/` was
+written with Claude Code (Opus 4.7). An honest retrospective — scope,
+wins, costs, failure modes, and the patterns that kept drift in check —
+lives in [`CLAUDE_USAGE_REPORT.md`](CLAUDE_USAGE_REPORT.md).
