@@ -13,6 +13,7 @@ import com.hackathon.chat.common.ForbiddenException;
 import com.hackathon.chat.conversation.Conversation;
 import com.hackathon.chat.conversation.ConversationService;
 import com.hackathon.chat.user.UserRepository;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
@@ -134,5 +135,37 @@ class RoomServiceTest {
 
         assertThatThrownBy(() -> service.requireMember(roomId, userId))
                 .isInstanceOf(ForbiddenException.class);
+    }
+
+    @Test
+    void listMineReturnsEmptyWhenNoMemberships() {
+        UUID userId = UUID.randomUUID();
+        when(memberRepo.findAllByUserId(userId)).thenReturn(List.of());
+
+        assertThat(service.listMine(userId)).isEmpty();
+        verify(roomRepo, never()).findAllById(any());
+    }
+
+    @Test
+    void listMineReturnsCallerRoomsSortedByName() {
+        UUID userId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        UUID roomA = UUID.randomUUID();
+        UUID roomB = UUID.randomUUID();
+        Room beta = new Room("beta", "", "public", ownerId);
+        beta.setConversationId(UUID.randomUUID());
+        Room alpha = new Room("alpha", "", "private", ownerId);
+        alpha.setConversationId(UUID.randomUUID());
+
+        when(memberRepo.findAllByUserId(userId)).thenReturn(List.of(
+                new RoomMember(roomA, userId, RoomMember.ROLE_MEMBER),
+                new RoomMember(roomB, userId, RoomMember.ROLE_OWNER)));
+        when(roomRepo.findAllById(any())).thenReturn(List.of(beta, alpha));
+        when(memberRepo.countByRoomId(any())).thenReturn(1L);
+        when(memberRepo.findByRoomIdAndUserId(any(), any())).thenReturn(Optional.empty());
+
+        List<RoomView> result = service.listMine(userId);
+
+        assertThat(result).extracting(RoomView::name).containsExactly("alpha", "beta");
     }
 }

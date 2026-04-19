@@ -40,6 +40,53 @@ class RoomFlowIT {
     private ObjectMapper json;
 
     @Test
+    void listMineReturnsJoinedRoomsIncludingPrivate() throws Exception {
+        Cookie aliceSession = registerAndGetSession("mine-a@example.com", "minea", "supersecret");
+        Cookie bobSession = registerAndGetSession("mine-b@example.com", "mineb", "supersecret");
+        Cookie eveSession = registerAndGetSession("mine-e@example.com", "minee", "supersecret");
+
+        // Alice owns one public room and one private room.
+        String publicId = createRoom(aliceSession, "mine-public", "x", "public");
+        String privateId = createRoom(aliceSession, "mine-private", "x", "private");
+
+        // Bob joins only the public room.
+        mvc.perform(post("/api/rooms/" + publicId + "/join").cookie(bobSession).with(csrf()))
+                .andExpect(status().isNoContent());
+
+        // /mine for Alice contains both — sorted by name (case-insensitive).
+        MvcResult aliceMine = mvc.perform(get("/api/rooms/mine").cookie(aliceSession))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andReturn();
+        JsonNode aliceRows = json.readTree(aliceMine.getResponse().getContentAsString());
+        assertThat(aliceRows.get(0).get("name").asText()).isEqualTo("mine-private");
+        assertThat(aliceRows.get(1).get("name").asText()).isEqualTo("mine-public");
+        // Both rows carry the viewer's role.
+        assertThat(aliceRows.get(0).get("myRole").asText()).isEqualTo("owner");
+        assertThat(aliceRows.get(1).get("myRole").asText()).isEqualTo("owner");
+
+        // /mine for Bob has only the public room.
+        mvc.perform(get("/api/rooms/mine").cookie(bobSession))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].name").value("mine-public"))
+                .andExpect(jsonPath("$[0].myRole").value("member"));
+
+        // Private room is NOT leaked to Bob — he is not a member.
+        mvc.perform(get("/api/rooms/mine").cookie(bobSession))
+                .andExpect(jsonPath("$[?(@.name=='mine-private')]").doesNotExist());
+
+        // /mine for Eve (no memberships) is empty.
+        mvc.perform(get("/api/rooms/mine").cookie(eveSession))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+
+        // /mine requires authentication.
+        mvc.perform(get("/api/rooms/mine"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void createJoinPromoteBanDelete() throws Exception {
         Cookie aliceSession = registerAndGetSession("alice1@example.com", "alice1", "supersecret");
         Cookie bobSession = registerAndGetSession("bob1@example.com", "bob1", "supersecret");
@@ -89,6 +136,16 @@ class RoomFlowIT {
 
         mvc.perform(get("/api/rooms/" + roomId).cookie(bobSession))
                 .andExpect(status().isNotFound());
+    }
+
+    private String createRoom(Cookie session, String name, String description, String visibility) throws Exception {
+        MvcResult created = mvc.perform(post("/api/rooms")
+                        .cookie(session).with(csrf())
+                        .contentType("application/json")
+                        .content(json.writeValueAsString(new CreateRoomBody(name, description, visibility))))
+                .andExpect(status().isCreated())
+                .andReturn();
+        return json.readTree(created.getResponse().getContentAsString()).get("id").asText();
     }
 
     private Cookie registerAndGetSession(String email, String username, String password) throws Exception {

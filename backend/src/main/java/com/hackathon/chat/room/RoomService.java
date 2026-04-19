@@ -139,8 +139,9 @@ public class RoomService {
         if (roomIds.isEmpty()) {
             return List.of();
         }
-        List<Room> rooms = roomRepository.findAllById(roomIds);
-        rooms.sort((a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+        List<Room> rooms = roomRepository.findAllById(roomIds).stream()
+                .sorted((a, b) -> a.getName().compareToIgnoreCase(b.getName()))
+                .toList();
         return toViews(rooms, viewerId);
     }
 

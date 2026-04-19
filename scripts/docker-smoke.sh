@@ -456,6 +456,16 @@ print(len(d['items']))" <<<"$SEED_DM_HIST")"
 
 green "  demo seed ok — 3 accounts, general-demo public, alice↔bob dialog with $DM_COUNT msgs"
 
+# /api/rooms/mine returns both public and private rooms the caller belongs to,
+# regardless of whether the public catalog would surface them.
+SEED_MINE="$(call GET /api/rooms/mine --jar "$SEED_JAR")"
+MINE_COUNT="$(python3 -c "import sys,json; print(len(json.loads(sys.stdin.read())))" <<<"$SEED_MINE")"
+[[ "$MINE_COUNT" -ge 2 ]] || fail "/api/rooms/mine should show ≥ 2 rooms for alice: $SEED_MINE"
+echo "$SEED_MINE" | grep -q "general-demo" || fail "/api/rooms/mine missing general-demo: $SEED_MINE"
+echo "$SEED_MINE" | grep -q "ops-demo" \
+  || fail "/api/rooms/mine should include private ops-demo for alice: $SEED_MINE"
+green "  /api/rooms/mine returns both seeded rooms (public + private)"
+
 # ───────────────────────── static assets ─────────────────────────────────
 
 step "Static — SPA fallback and Angular bundle"
