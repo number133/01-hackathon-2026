@@ -1,166 +1,115 @@
-# How Claude Was Used on This Project — A Retrospective
+# How Claude Was Used on This Project
 
-An honest-as-possible summary of what Claude Code (Opus 4.7, 1M context) did
-on this repo, what it cost in friction, and what patterns kept it useful.
+A concise, step-by-step account of the workflow that produced this repo with
+Claude Code (Opus 4.7, 1M context). Every file under `backend/`, `frontend/`,
+and `frontend/e2e/` was authored in-session; this document explains how.
 
-## TL;DR
+## Inputs Claude worked from
 
-Claude implemented essentially the entire stack — Spring Boot backend, Angular
-17 frontend, Playwright e2e suite — in ten planned phases plus iteration.
-Speed and breadth were the headline wins. The real costs were not output
-quality but **verification overhead** and **grounding drift**: Claude
-repeatedly wrote code against assumptions that the actual codebase then
-contradicted, and the burden of catching that fell on the human. Structured
-conventions (`CLAUDE.md`, phase plans, a separate test-scenarios doc) kept the
-drift inside tolerable bounds.
+- **Requirements** — `howto/tasks/app_requirements.txt` (spec + wireframes).
+- **Stack constraints** — `howto/general/*.txt` (fixed Java 21 / Spring Boot /
+  Angular / Postgres / Flyway / no-JWT; `docker compose up` must boot it).
+- **Implementation hints** — three short `hint*.txt` notes from the user
+  (e.g. "use a per-conversation watermark, not a per-user queue").
+- **Conventions** — `CLAUDE.md` (no Javadoc by default, verify DB names
+  before use, match existing module style).
 
-## Scope Claude actually covered
+## The step-by-step loop
 
-From `git log` on this branch:
+The same five-step loop was applied to every piece of work. Phase plans and
+the test-scenarios doc are its durable artifacts.
 
-- **Phase 0–9** — scaffolding, auth, rooms, messaging/WS, presence, contacts +
-  bans, attachments, notifications/unread, admin UI, end-to-end hardening.
-  Twenty-four commits from `1863aa6 scaffold Phase 0` through
-  `8a471a2 implement Phase 9`.
-- **Gap-closure pass** — `6c07de4 close requirement gaps` addressed concrete
-  diffs against `howto/tasks/app_requirements.txt` (add-friend from rooms,
-  paste attachments, rate limits, disconnect-aware presence).
-- **Playwright e2e suite** — `1b600c0` + `b4f55fc`: 78 green UI tests covering
-  every requirement section except the stretch Jabber one, with 16 inline-
-  reasoned skips and a full traceability doc at
-  `howto/tasks/test_scenarios.md`.
+1. **Architect once, up front.** Claude wrote
+   `howto/tasks/app_requirements_plan.md` — proposed runtime topology,
+   module layout, transport split (REST + STOMP), and the list of ten
+   implementation phases. The human reviewed and redirected before any code
+   was written.
 
-No human-authored code was deliberately left in this branch. Every file under
-`backend/`, `frontend/`, `scripts/`, and the e2e folder originated with
-Claude, reviewed and redirected by the human operator.
+2. **Plan each phase separately.** For every phase, a dedicated
+   `howto/tasks/phase_N_plan.md` was produced first: exit criteria, data
+   model changes, endpoint table, and a DoD checklist. The human read these
+   before green-lighting the phase.
 
-## What worked well
+3. **Implement the phase end-to-end.** Claude wrote the Flyway migration,
+   backend service + controller, frontend service + component, and tests in
+   one pass, keeping to the conventions in `CLAUDE.md`.
 
-1. **End-to-end breadth in a single tool.** The same session pivoted from
-   Java/JPA/Flyway migrations, through Angular standalone components and
-   RxJS signals, into Playwright specs and GitHub-flavored Markdown docs
-   without a context switch penalty for the human. That "one collaborator
-   who knows the whole stack" property is the single biggest productivity
-   win the tool delivered.
+4. **Verify before commit.** `./gradlew test` on the backend plus a browser
+   check of the new UI. The `scripts/docker-smoke.sh` script was run once per
+   completed phase (wipes the db, rebuilds the image, curls every endpoint).
 
-2. **Plans as a forcing function.** Each phase began with a plan file under
-   `howto/tasks/phase_*.md` that the human skimmed before Claude started
-   writing code. Phases where that plan was read and redirected *before*
-   coding took fewer iterations than phases where Claude jumped straight to
-   code.
+5. **Commit as `implement Phase N: <summary>`.** One commit per phase in
+   normal cases; two when the DoD surfaced a sub-task (e.g.
+   `3dcebd9 Phase 3.1: split "remove" from "ban"`).
 
-3. **Convention capture via `CLAUDE.md`.** The repo's `CLAUDE.md` (no Javadoc
-   by default, no guessing DB names, match existing module style) was
-   honored across sessions. The separate auto-memory system also captured
-   friction-points across conversations — e.g. the blocked
-   `Co-Authored-By Claude` commit-trailer hook was learned once and not
-   repeated.
+## Phase-by-phase ledger
 
-4. **Honest skips with inline reasons.** When something couldn't be cleanly
-   automated (wall-clock AFK, STOMP reconnect races, 20 MB upload rejection),
-   Claude used `test.skip(...)` with a human-readable rationale rather than
-   faking a pass. That made the 16 skips auditable in one pass — see the
-   coverage table in `README.md`.
+All eleven phases and the follow-ups, in order, from `git log`:
 
-5. **Self-verification before claiming done.** Every phase commit was
-   preceded by `./gradlew test` and a compile; the e2e commits ran Playwright
-   end-to-end. Failures were fixed in the same session rather than shipped
-   forward.
+| Commit | Phase | What Claude built |
+|--------|-------|-------------------|
+| `1863aa6` | 0 | `docker compose up` baseline — Angular + Spring Boot + Postgres + Flyway wired end-to-end. |
+| `a071af0` | 1 | Auth: registration, session login, password reset, account lifecycle. |
+| `8af6c21` | 2 | Rooms: public/private, membership, roles, admin actions. |
+| `b755eed` | 3 | Messaging: REST send + STOMP fan-out, edit, soft-delete, reply, keyset history. |
+| `4cab30c` | 3 fix | DoD gaps caught during browser verification. |
+| `3dcebd9` | 3.1 | Split "remove member" from "ban" in room moderation. |
+| `a794d42` | 4 | Presence (online / AFK / offline) with per-tab pings. |
+| `e787e8d` | 5 | Contacts, friend requests, user-to-user bans, personal dialogs. |
+| `7fc8e9e` | 6 | Attachments on messages (files + images, rate-limited uploads). |
+| `da799e0` | 7 | Notifications and unread state. |
+| `90aa231` | 8 | Admin UI polish (Manage Room modal with five tabs). |
+| `8a471a2` | 9 | End-to-end hardening for the demo. |
+| `6c07de4` | audit | Gap-closure pass driven by `howto/tasks/gap_report_2026-04-19.md`. |
+| `1b600c0` + `b4f55fc` | e2e | Playwright suite: 78 green UI tests + `frontend/e2e/` scaffolding. |
 
-## What didn't work / cost
+## Tooling patterns that supported the loop
 
-1. **Grounding drift. This is the dominant failure mode.** Claude routinely
-   wrote or asserted things that the actual code contradicted:
-   - It told the human "there is no UI to unblock a banned user"
-     (`test_scenarios.md` §11, answer #1), then later discovered the
-     `Unblock` button literally sitting in `contacts.component.html`.
-   - It initially wrote `test_scenarios.md` TC-ROOM-016 asserting
-     "Remove member is treated as a ban" (faithful to §2.4.8 of the
-     requirements). The backend does not implement that rule; the e2e test
-     had to be rewritten to assert actual behavior and flag the gap.
-   - The first Playwright run discovered that half the API-driven tests
-     returned 403 because Spring's CSRF filter was enforcing
-     `X-XSRF-TOKEN`. That cookie warming is a one-line detail the human
-     had to catch from the failing traces.
+- **Exploration before implementation.** For each non-trivial step, Claude
+  ran an `Explore` sub-agent with a concrete checklist (file paths, selector
+  tables, endpoint shapes) before writing code. That map was the input to
+  step 3 of the loop.
+- **Traceable test IDs.** Every Playwright test carries a `TC-…` ID that
+  maps to `howto/tasks/test_scenarios.md`, which in turn points back to the
+  requirement clause in `app_requirements.txt`. Diffing the three files
+  surfaces coverage gaps mechanically.
+- **Honest `test.skip` with reasons.** When a case couldn't be cleanly
+  automated (wall-clock AFK, 20 MB uploads, STOMP reconnect races),
+  `test.skip(...)` carries an inline rationale rather than silently passing.
+  Sixteen of the ninety-four documented cases are in this state.
+- **Auto-memory across sessions.** Project-wide facts that future sessions
+  need (e.g. the blocked `Co-Authored-By Claude` commit-trailer hook) are
+  persisted in `~/.claude/.../memory/` and avoid re-litigation.
 
-   **Mitigation that actually helped:** forcing Claude to use an Explore
-   subagent with a concrete checklist ("confirm file paths, grep for
-   selectors, return file:line pointers") before writing code. Ad-hoc
-   "check the code" prompts produced worse grounding than a structured
-   exploration pass.
+## Failure modes actually encountered
 
-2. **Selector and timing flakiness in UI tests.** Typical iteration on the
-   first pass through the messaging spec: 11 tests failing on the first run,
-   down to 3, to 1, to 0 over four edit/run cycles. Root causes were split
-   between legitimate STOMP reconnection races (two tests ended up skipped
-   on purpose) and Claude picking CSS selectors that matched the wrong
-   elements (`.badge` vs `.unread-badge`, clicking the emoji-picker's
-   disabled search clear button). Each miss cost ~30–60 s of wall-clock on
-   a Playwright re-run, and several required screenshot/page-snapshot
-   diffing to resolve.
+Three recurring frictions — worth naming so future sessions mitigate them:
 
-3. **Scope creep under "auto mode".** When invited to run autonomously
-   ("implement and run tests in §2.1 Authentication"), Claude did the job,
-   but `npm install` side effects, extra dependency bumps, and bolt-on
-   helpers sometimes arrived unannounced. The human had to re-read each
-   diff carefully. The win from autonomy is real but it is not free.
+1. **Grounding drift.** Claude occasionally answered confidently from
+   assumption instead of re-reading the file. Two concrete misses shipped
+   before the e2e pass caught them: "no unban UI" (an `Unblock` button
+   exists in `contacts.component.html`), and TC-ROOM-016's claim that
+   "Remove is treated as a ban" (backend implements remove and ban as
+   separate actions). Both are now explicitly called out in
+   `test_scenarios.md`.
+2. **Selector/timing flakiness on first UI-test pass.** The messaging spec
+   went 11 → 3 → 1 → 0 failing tests over four edit/run cycles, driven
+   mostly by CSS-selector mismatches and WebSocket-reconnection races.
+3. **Doc sprawl inside `howto/`.** Eleven phase plans + gap reports + a
+   session log accumulated. Valuable during implementation, obvious sprawl
+   after. The durable surface kept committed is `README.md`, `CLAUDE.md`,
+   and this file; the rest stays globally git-ignored.
 
-4. **Documentation files proliferate if unchecked.** The `howto/` tree
-   accumulated eleven phase plans, gap reports, and session logs, all
-   gitignored locally. Useful while the work was live; obvious sprawl
-   once the feature was done. Keeping `CLAUDE.md` and `README.md` as the
-   durable surface, and letting ephemeral plans die in the scratch folder,
-   kept the committed doc set small.
+## Final state
 
-5. **Cost/latency that doesn't show in the diff.** A single 78-test
-   Playwright run ≈ 3 minutes; a full `git log` of the work is 24 commits,
-   each typically preceded by 3–10 intermediate runs during iteration.
-   The token bill, while not tracked precisely here, is substantial; using
-   fast mode (Opus 4.6) for narrow lookups and full Opus 4.7 only for
-   stitching phases together was the practical compromise.
+- `docker compose up` boots the full stack with a seeded demo.
+- Requirements §2–§5 implemented; §6 (Jabber/XMPP federation) intentionally
+  out of scope.
+- 78 green Playwright tests, 16 documented skips, 0 failing.
+- Two known requirement-vs-implementation gaps documented inline (user-ban
+  reversibility, remove-as-ban).
 
-## Patterns that consistently paid off
-
-- **Traceable specs.** Every `TC-…` ID in `test_scenarios.md` points to a
-  clause in `app_requirements.txt` *and* to a passing (or skipped) spec in
-  `frontend/e2e/`. That three-way link is the artifact that made the
-  requirement-vs-implementation gaps visible.
-- **Small, named helpers in test code.** `apiPost`, `registerViaApi`,
-  `makeFriends`, `createPublicRoom` — writing these up-front in
-  `helpers/auth.ts` meant later specs read like requirements prose.
-- **Sub-agent research before implementation.** The three "map the
-  code" Explore runs in this repo account for a disproportionate share of
-  the time-saved: they produced concrete selector and endpoint tables that
-  the spec-writing passes then consumed without re-guessing.
-- **Reverting to REST when WebSocket flakes.** Several messaging specs
-  `page.reload()` after a UI send instead of trusting the live STOMP push.
-  Slower per-test but deterministic.
-
-## Patterns that consistently didn't
-
-- Trusting a remembered fact without re-reading the file — see the
-  "ban is terminal" miss.
-- Letting Claude pick selectors from a generic description. Always better
-  to grep the actual template first.
-- Skipping the plan step for "small" changes. The small changes were the
-  ones most likely to need a follow-up commit.
-
-## Final ledger
-
-- **Shipped:** a runnable `docker compose up` chat server implementing
-  nearly all of `app_requirements.txt` §2–§5, with demo seed data, an
-  admin UI, a docker-smoke script, and a Playwright suite that fails
-  loudly when any of it regresses.
-- **Not shipped:** the stretch Jabber/XMPP federation section (§6), plus
-  perf and wall-clock-bound scenarios deliberately skipped in the e2e
-  suite.
-- **Known gaps (documented, not hidden):** two specific requirement-vs-
-  implementation mismatches on user-to-user ban reversibility and
-  room-remove-as-ban behavior. Both are called out in `test_scenarios.md`
-  §1 and §4 with file pointers.
-
-The overall conclusion is the boring one: Claude dramatically reduced the
-wall-clock time to a usable chat server, at the cost of a human operator
-who had to grep, verify, and redirect on a roughly per-commit cadence. The
-tooling around it — plans, memory, `CLAUDE.md`, the traceable test doc —
-was what made that redirect cheap enough to be worth doing.
+The workflow above — plan, phase, implement, verify, commit — is what made
+that reachable inside the hackathon window. The plan and test-scenarios
+artifacts are what kept Claude's output aligned with the spec across
+sessions.
