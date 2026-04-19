@@ -35,6 +35,7 @@ export class ChatSidebarComponent implements OnInit, OnDestroy {
   readonly unread = inject(UnreadService);
 
   readonly search = new FormControl<string>('', { nonNullable: true });
+  readonly searchTerm = signal('');
   readonly myRooms = signal<RoomView[]>([]);
   readonly dialogs = signal<DialogView[]>([]);
 
@@ -45,7 +46,7 @@ export class ChatSidebarComponent implements OnInit, OnDestroy {
     this.filtered(this.myRooms().filter((r) => r.visibility === 'private')),
   );
   readonly contacts = computed(() => {
-    const term = this.search.value.trim().toLowerCase();
+    const term = this.searchTerm().trim().toLowerCase();
     const rows = this.friends.friends();
     if (!term) return rows;
     return rows.filter((f) => f.username.toLowerCase().includes(term));
@@ -61,7 +62,10 @@ export class ChatSidebarComponent implements OnInit, OnDestroy {
         this.refresh();
       }
     });
-    this.search.valueChanges.subscribe(() => this.rewatchContacts());
+    this.search.valueChanges.subscribe((value) => {
+      this.searchTerm.set(value);
+      this.rewatchContacts();
+    });
   }
 
   ngOnDestroy(): void {
@@ -96,7 +100,7 @@ export class ChatSidebarComponent implements OnInit, OnDestroy {
   }
 
   private filtered(rows: RoomView[]): RoomView[] {
-    const term = this.search.value.trim().toLowerCase();
+    const term = this.searchTerm().trim().toLowerCase();
     if (!term) return rows;
     return rows.filter(
       (r) =>

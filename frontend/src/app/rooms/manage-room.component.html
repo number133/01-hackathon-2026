@@ -17,12 +17,19 @@
     </nav>
 
     <section *ngIf="tab() === 'members'">
-      <table>
+      <input type="text"
+             class="search"
+             [formControl]="memberSearch"
+             placeholder="Search member…" />
+      <p *ngIf="visibleMembers().length === 0 && members().length > 0" class="muted small">
+        No members match "{{ memberSearchTerm() }}".
+      </p>
+      <table *ngIf="visibleMembers().length > 0">
         <thead>
           <tr><th>Username</th><th>Status</th><th>Role</th><th>Actions</th></tr>
         </thead>
         <tbody>
-          <ng-container *ngFor="let m of members()">
+          <ng-container *ngFor="let m of visibleMembers()">
             <tr>
               <td><app-presence-dot [userId]="m.userId"></app-presence-dot>{{ m.username }}</td>
               <td class="muted">{{ presenceStatus(m.userId) }}</td>

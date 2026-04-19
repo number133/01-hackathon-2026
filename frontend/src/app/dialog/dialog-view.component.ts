@@ -66,7 +66,7 @@ export class DialogViewComponent {
         this.lastAckedSeq = seq;
         this.unread.markRead(d.id, seq);
       }
-    });
+    }, { allowSignalWrites: true });
   }
 
   ngOnInit(): void {

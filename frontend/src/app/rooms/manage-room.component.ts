@@ -56,6 +56,15 @@ export class ManageRoomComponent implements OnInit, OnChanges, OnDestroy {
   readonly roomInvites = signal<InvitationView[]>([]);
   readonly error = signal<string | null>(null);
 
+  readonly memberSearch = new FormControl<string>('', { nonNullable: true });
+  readonly memberSearchTerm = signal('');
+  readonly visibleMembers = computed(() => {
+    const term = this.memberSearchTerm().trim().toLowerCase();
+    const rows = this.members();
+    if (!term) return rows;
+    return rows.filter((m) => m.username.toLowerCase().includes(term));
+  });
+
   readonly inviteUsername = this.fb.nonNullable.group({
     username: ['', [Validators.required, Validators.maxLength(40)]],
     message: [''],
@@ -81,6 +90,7 @@ export class ManageRoomComponent implements OnInit, OnChanges, OnDestroy {
 
   ngOnInit(): void {
     this.loadRoom(this.roomId);
+    this.memberSearch.valueChanges.subscribe((v) => this.memberSearchTerm.set(v));
   }
 
   ngOnChanges(changes: SimpleChanges): void {

@@ -49,7 +49,7 @@ export class MessageListComponent implements OnInit, OnDestroy, AfterViewChecked
         this.lastAckedSeq = seq;
         this.unread.markRead(this.conversationId, seq);
       }
-    });
+    }, { allowSignalWrites: true });
   }
 
   ngOnInit(): void {
