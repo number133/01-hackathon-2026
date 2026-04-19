@@ -4,8 +4,9 @@ import {
   Component,
   ElementRef,
   Input,
+  OnChanges,
   OnDestroy,
-  OnInit,
+  SimpleChanges,
   ViewChild,
   computed,
   effect,
@@ -23,7 +24,7 @@ import { MessageItemComponent } from './message-item.component';
   imports: [CommonModule, MessageItemComponent],
   templateUrl: './message-list.component.html',
 })
-export class MessageListComponent implements OnInit, OnDestroy, AfterViewChecked {
+export class MessageListComponent implements OnChanges, OnDestroy, AfterViewChecked {
   @Input({ required: true }) roomId!: string;
   @Input({ required: true }) conversationId!: string;
   @Input() myUserId: string | null = null;
@@ -36,6 +37,7 @@ export class MessageListComponent implements OnInit, OnDestroy, AfterViewChecked
   private pinnedToBottom = true;
   private loadMoreGuard = false;
   private lastAckedSeq = 0;
+  private subscribedRoomId: string | null = null;
 
   readonly messages = computed(() => this.chat.state(this.roomId).messages);
   readonly loading = computed(() => this.chat.state(this.roomId).loading);
@@ -52,14 +54,27 @@ export class MessageListComponent implements OnInit, OnDestroy, AfterViewChecked
     }, { allowSignalWrites: true });
   }
 
-  ngOnInit(): void {
+  ngOnChanges(changes: SimpleChanges): void {
+    if (!changes['roomId']) return;
     this.chat.connect();
-    this.chat.subscribeRoom(this.roomId);
-    this.chat.loadInitial(this.roomId).subscribe();
+    if (this.subscribedRoomId && this.subscribedRoomId !== this.roomId) {
+      this.chat.unsubscribeRoom(this.subscribedRoomId);
+    }
+    if (this.subscribedRoomId !== this.roomId) {
+      this.chat.subscribeRoom(this.roomId);
+      this.subscribedRoomId = this.roomId;
+      this.replyingTo.set(null);
+      this.lastAckedSeq = 0;
+      this.pinnedToBottom = true;
+      this.chat.loadInitial(this.roomId).subscribe();
+    }
   }
 
   ngOnDestroy(): void {
-    this.chat.unsubscribeRoom(this.roomId);
+    if (this.subscribedRoomId) {
+      this.chat.unsubscribeRoom(this.subscribedRoomId);
+      this.subscribedRoomId = null;
+    }
   }
 
   ngAfterViewChecked(): void {

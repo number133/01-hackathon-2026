@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
+import { Subscription } from 'rxjs';
 
 import { AuthService } from '../auth/auth.service';
 import { ComposerComponent } from '../chat/composer.component';
@@ -24,7 +25,7 @@ import { RoomMemberView, RoomService, RoomView } from './room.service';
   ],
   templateUrl: './room-view.component.html',
 })
-export class RoomViewComponent implements OnInit {
+export class RoomViewComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly rooms = inject(RoomService);
@@ -38,13 +39,26 @@ export class RoomViewComponent implements OnInit {
   readonly myUserId = computed(() => this.auth.user()?.id ?? null);
   readonly manageOpen = signal(false);
 
+  private paramSub?: Subscription;
+
   ngOnInit(): void {
-    const id = this.route.snapshot.paramMap.get('id');
-    if (!id) {
-      this.router.navigate(['/rooms']);
-      return;
-    }
-    this.load(id);
+    this.paramSub = this.route.paramMap.subscribe((params) => {
+      const id = params.get('id');
+      if (!id) {
+        this.router.navigate(['/rooms']);
+        return;
+      }
+      this.room.set(null);
+      this.members.set([]);
+      this.manageOpen.set(false);
+      this.error.set(null);
+      this.loading.set(true);
+      this.load(id);
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.paramSub?.unsubscribe();
   }
 
   private load(id: string): void {
