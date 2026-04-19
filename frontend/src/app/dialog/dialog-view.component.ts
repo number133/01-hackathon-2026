@@ -4,9 +4,10 @@ import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 
 import { AttachmentPickerComponent } from '../attachment/attachment-picker.component';
-import { AttachmentViewComponent } from '../attachment/attachment-view.component';
 import { AuthService } from '../auth/auth.service';
-import { ChatService } from '../chat/chat.service';
+import { ChatService, MessageView } from '../chat/chat.service';
+import { EmojiPickerButtonComponent } from '../chat/emoji-picker-button.component';
+import { MessageItemComponent } from '../chat/message-item.component';
 import { ChatSidebarComponent } from '../layout/chat-sidebar.component';
 import { PresenceDotComponent } from '../presence/presence-dot.component';
 import { PresenceService } from '../presence/presence.service';
@@ -21,8 +22,9 @@ import { DialogService, DialogView } from './dialog.service';
     ReactiveFormsModule,
     PresenceDotComponent,
     AttachmentPickerComponent,
-    AttachmentViewComponent,
     ChatSidebarComponent,
+    MessageItemComponent,
+    EmojiPickerButtonComponent,
   ],
   templateUrl: './dialog-view.component.html',
 })
@@ -40,10 +42,12 @@ export class DialogViewComponent {
   readonly dialog = signal<DialogView | null>(null);
   readonly error = signal<string | null>(null);
   readonly attachmentIds = signal<string[]>([]);
+  readonly replyingTo = signal<MessageView | null>(null);
   readonly text = new FormControl<string>('', {
     nonNullable: true,
     validators: [Validators.maxLength(3072)],
   });
+  readonly myUserId = computed(() => this.auth.user()?.id ?? null);
 
   readonly messages = computed(() => {
     const d = this.dialog();
@@ -110,11 +114,13 @@ export class DialogViewComponent {
     if (!d || d.frozen || !this.canSend()) return;
     const body = this.text.value.trim();
     const ids = this.attachmentIds();
-    this.dialogs.post(d.id, body, null, ids).subscribe({
+    const replyId = this.replyingTo()?.id ?? null;
+    this.dialogs.post(d.id, body, replyId, ids).subscribe({
       next: () => {
         this.text.reset('');
         this.picker?.clear();
         this.attachmentIds.set([]);
+        this.replyingTo.set(null);
       },
       error: (err: unknown) => this.error.set(this.auth.errorText(err)),
     });
@@ -125,5 +131,30 @@ export class DialogViewComponent {
       ev.preventDefault();
       this.send();
     }
+  }
+
+  onReply(m: MessageView): void {
+    this.replyingTo.set(m);
+  }
+
+  clearReply(): void {
+    this.replyingTo.set(null);
+  }
+
+  canEdit(m: MessageView): boolean {
+    const uid = this.myUserId();
+    return !m.deletedAt && !!uid && m.authorId === uid;
+  }
+
+  canDelete(m: MessageView): boolean {
+    if (m.deletedAt) return false;
+    const uid = this.myUserId();
+    return !!uid && m.authorId === uid;
+  }
+
+  insertEmoji(emoji: string): void {
+    const next = (this.text.value ?? '') + emoji;
+    if (next.length > 3072) return;
+    this.text.setValue(next);
   }
 }

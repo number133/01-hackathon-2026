@@ -21,8 +21,11 @@
 
   <div class="row between">
     <span class="muted small">{{ text.value.length }}/3072</span>
-    <button type="button" (click)="submit()" [disabled]="!canSend()">
-      {{ submitting() ? 'Sending…' : 'Send' }}
-    </button>
+    <div class="row" style="gap: 8px; align-items: center;">
+      <app-emoji-picker-button (emojiSelected)="insertEmoji($event)"></app-emoji-picker-button>
+      <button type="button" (click)="submit()" [disabled]="!canSend()">
+        {{ submitting() ? 'Sending…' : 'Send' }}
+      </button>
+    </div>
   </div>
 </section>

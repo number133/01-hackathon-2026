@@ -747,3 +747,24 @@ button.link.danger {
     border-bottom: 1px solid #1f2937;
   }
 }
+
+.emoji-picker-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.emoji-toggle {
+  font-size: 1.2em;
+  line-height: 1;
+}
+
+.emoji-popover {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  border-radius: 8px;
+  overflow: hidden;
+}
+

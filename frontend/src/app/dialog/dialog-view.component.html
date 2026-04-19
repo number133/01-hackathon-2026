@@ -17,39 +17,44 @@
     <div *ngIf="error() as msg" class="error">{{ msg }}</div>
 
     <div class="messages">
-      <article *ngFor="let m of messages()">
-        <header>
-          <strong>{{ m.authorUsername }}</strong>
-          <small>{{ m.createdAt | date: 'short' }}</small>
-          <small *ngIf="m.editedAt" class="muted">(edited)</small>
-        </header>
-        <p *ngIf="!m.deletedAt && m.body">{{ m.body }}</p>
-        <p *ngIf="m.deletedAt" class="muted">(deleted)</p>
-        <div *ngIf="!m.deletedAt && m.attachments?.length" class="attachments">
-          <app-attachment-view
-            *ngFor="let a of m.attachments"
-            [attachment]="a">
-          </app-attachment-view>
-        </div>
-      </article>
+      <app-message-item
+        *ngFor="let m of messages()"
+        [message]="m"
+        [canEdit]="canEdit(m)"
+        [canDelete]="canDelete(m)"
+        (reply)="onReply($event)">
+      </app-message-item>
       <div *ngIf="messages().length === 0" class="empty-state small">
         No messages yet. Say hi!
       </div>
     </div>
 
-    <form (ngSubmit)="send()" *ngIf="!d.frozen" class="composer">
+    <section *ngIf="!d.frozen" class="composer">
+      <div *ngIf="replyingTo() as r" class="reply-chip between">
+        <span class="muted small">Replying to {{ r.authorUsername }}: {{ r.body ?? '(deleted)' }}</span>
+        <button type="button" class="link small" (click)="clearReply()">×</button>
+      </div>
+
       <textarea
         [formControl]="text"
         (keydown)="handleKeydown($event)"
         rows="2"
+        maxlength="3072"
         placeholder="Type a message. Enter to send, Shift+Enter for newline."
       ></textarea>
       <app-attachment-picker
         [conversationId]="d.id"
         (idsChange)="onAttachmentsChange($event)">
       </app-attachment-picker>
-      <button type="submit" [disabled]="!canSend()">Send</button>
-    </form>
+
+      <div class="row between">
+        <span class="muted small">{{ text.value.length }}/3072</span>
+        <div class="row" style="gap: 8px; align-items: center;">
+          <app-emoji-picker-button (emojiSelected)="insertEmoji($event)"></app-emoji-picker-button>
+          <button type="button" (click)="send()" [disabled]="!canSend()">Send</button>
+        </div>
+      </div>
+    </section>
   </section>
 
   <aside class="chat-context">

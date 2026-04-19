@@ -6,11 +6,17 @@ import { AttachmentPickerComponent } from '../attachment/attachment-picker.compo
 import { AuthService } from '../auth/auth.service';
 import { NotificationService } from '../core/notification/notification.service';
 import { ChatService, MessageView } from './chat.service';
+import { EmojiPickerButtonComponent } from './emoji-picker-button.component';
 
 @Component({
   selector: 'app-composer',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, AttachmentPickerComponent],
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    AttachmentPickerComponent,
+    EmojiPickerButtonComponent,
+  ],
   templateUrl: './composer.component.html',
 })
 export class ComposerComponent {
@@ -73,5 +79,11 @@ export class ComposerComponent {
       event.preventDefault();
       this.submit();
     }
+  }
+
+  insertEmoji(emoji: string): void {
+    const next = (this.text.value ?? '') + emoji;
+    if (next.length > 3072) return;
+    this.text.setValue(next);
   }
 }

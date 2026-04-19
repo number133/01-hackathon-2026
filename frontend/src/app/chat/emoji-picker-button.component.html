@@ -1,0 +1,24 @@
+<div class="emoji-picker-wrap">
+  <button
+    type="button"
+    class="link emoji-toggle"
+    (click)="toggle()"
+    [attr.aria-expanded]="open()"
+    aria-label="Insert emoji"
+    title="Insert emoji">
+    😀
+  </button>
+
+  <div *ngIf="open()" class="emoji-popover" (mousedown)="$event.stopPropagation()">
+    <emoji-mart
+      [isNative]="true"
+      [showPreview]="false"
+      [emojiSize]="20"
+      [perLine]="8"
+      [autoFocus]="false"
+      [darkMode]="true"
+      title="Pick an emoji"
+      (emojiClick)="onEmojiSelect($event)">
+    </emoji-mart>
+  </div>
+</div>
