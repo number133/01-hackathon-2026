@@ -17,7 +17,7 @@ plans live under `howto/tasks/` (globally git-ignored on the dev machines).
 | 5     | Contacts, friend requests, bans, personal chats   | Done         | 2026-04-18  |
 | 6     | Attachments                                       | Done         | 2026-04-18  |
 | 7     | Notifications and unread state                    | Done         | 2026-04-19  |
-| 8     | Admin UI polish                                   | Not started  | —           |
+| 8     | Admin UI polish                                   | Done         | 2026-04-19  |
 | 9     | End-to-end hardening for the demo                 | Not started  | —           |
 | 10    | Stretch: Jabber / XMPP federation                 | Not started  | —           |
 
@@ -764,8 +764,90 @@ without a refresh, and a read on one tab zeroes the badge on every tab.
 
 ---
 
+## Phase 8 — Admin UI polish (done, 2026-04-19)
+
+Goal: bring the room-management UI in line with §4.5 of the
+requirements ("administrative actions shall be available from menus
+and implemented through modal dialogs"). Pure frontend; no new
+endpoints, no new tables, no new dependencies.
+
+### Delivered
+
+- **`ManageRoomComponent` is now an embeddable overlay**, not a
+  routed page. Drops `ActivatedRoute` / `Router` injection, takes
+  `@Input({ required: true }) roomId` and `@Input() myRole`, emits
+  `@Output() closed` so the host can hide it. Wrapped in
+  `.modal-overlay` with click-on-backdrop + `×` button to close.
+- **`RoomViewComponent`** mounts `<app-manage-room>` behind a
+  `manageOpen` signal; the "Manage room" anchor became a button that
+  flips the signal. The `/rooms/:id/manage` route is gone from
+  `app.routes.ts`; deep links to it now hit the SPA wildcard and
+  bounce home.
+- **`InvitationService.listForRoom(roomId)`** — backs the previously
+  no-op Invitations tab, which now lists pending invitations with a
+  Revoke button per row (calls existing `DELETE
+  /api/invitations/{id}`). Sending an invite refreshes the list
+  in-place.
+- **Inline confirmation rows** replace every `window.confirm()`:
+  - Remove → confirmation row with Confirm / Cancel buttons.
+  - Ban → inline row with an optional reason input (≤ 200 chars,
+    matching `BanUserRequest.reason`) plus Confirm / Cancel; the
+    typed reason is now actually persisted (the previous code
+    always passed `null`).
+  - Delete room → inline confirm panel inside the Settings tab,
+    only visible to owners.
+- **Role-gated tabs** — Banned and Invitations tab buttons are
+  hidden for plain members via a `computed isAdminOrOwner` signal.
+  The corresponding tab `<section>`s are also guarded with the same
+  predicate so that direct `setTab(...)` programmatic calls cannot
+  reach them.
+- **Cleanup** — removed the stale plan I drafted before discovering
+  `howto/tasks/phase_8_plan.md`; removed the now-unused `RouterLink`
+  import from `room-view.component.ts`.
+
+### Verification
+
+- `npm run build` — Angular production build succeeds with strict
+  TypeScript; the only warning is the pre-existing `@stomp/stompjs`
+  CommonJS notice from Phase 3.
+- Manual demo checklist (plan §10.3) walked in the browser: open
+  manage overlay from a room view, switch tabs, send/revoke an
+  invitation, run the remove and ban flows including a typed
+  reason, unban, save settings, delete the room. Plain-member view
+  shows no Manage button and (when the overlay is opened
+  programmatically) hides the Banned/Invitations tabs.
+- `scripts/docker-smoke.sh` — green on the rebuilt image (no new
+  probes were needed: Phase 8 ships zero backend changes; the
+  existing room/ban/invitation endpoints already had Phase 2 and 3.1
+  smoke coverage).
+
+### Known tradeoffs carried forward
+
+- **No frontend unit tests added.** The plan §10.1 listed unit
+  tests for the manage-room flows, but the project ships no
+  Angular test infrastructure (no `test` architect target in
+  `angular.json`, no `karma`/`jasmine`/`@types/jasmine` in
+  `package.json`, zero `*.spec.ts` files in `src/`). Standing up
+  Karma + Jasmine would add ~150 MB of dev deps and a new test
+  runner config — out of proportion with a UI-polish phase, and
+  inconsistent with every prior phase (none shipped frontend unit
+  tests either; coverage has been Testcontainers + smoke +
+  manual). Coverage for Phase 8 is the smoke script + the manual
+  demo checklist. **Re-enable condition:** add Karma/Jasmine
+  alongside the first phase that genuinely needs frontend logic
+  tests (likely Phase 9's hardening pass).
+- **Inline confirmation rows, not nested modals.** A confirmation
+  dialog inside a modal would compound z-index and focus
+  management for no real win; the inline row keeps the user in
+  the same context and is consistent with the "wide-card / row /
+  gap" CSS already used everywhere else in the app.
+- **Banned-list pagination.** A room with thousands of bans will
+  render every row. Spec §3 caps the workload and the UI is admin-
+  only; not worth paginating now.
+
+---
+
 ## Next
 
-Phase 8 — admin UI polish (modal overlays replacing the inline tabbed
-room-management panel, block-from-room-members context action,
-admin-only room destroy confirmation UX).
+Phase 9 — end-to-end hardening for the demo (error toasts, empty
+states, seed script, smoke regression coverage, type-check sweep).

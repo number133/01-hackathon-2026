@@ -1,7 +1,18 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  OnDestroy,
+  OnInit,
+  Output,
+  SimpleChanges,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
+import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 
 import { AuthService } from '../auth/auth.service';
 import { PresenceDotComponent } from '../presence/presence-dot.component';
@@ -20,17 +31,19 @@ type Tab = 'members' | 'admins' | 'banned' | 'invitations' | 'settings';
 @Component({
   selector: 'app-manage-room',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink, PresenceDotComponent],
+  imports: [CommonModule, ReactiveFormsModule, PresenceDotComponent],
   templateUrl: './manage-room.component.html',
 })
-export class ManageRoomComponent implements OnInit, OnDestroy {
-  private readonly route = inject(ActivatedRoute);
-  private readonly router = inject(Router);
+export class ManageRoomComponent implements OnInit, OnChanges, OnDestroy {
   private readonly rooms = inject(RoomService);
   private readonly invitations = inject(InvitationService);
   private readonly auth = inject(AuthService);
   private readonly presence = inject(PresenceService);
   private readonly fb = inject(FormBuilder);
+
+  @Input({ required: true }) roomId!: string;
+  @Input() myRole: 'owner' | 'admin' | 'member' | null = null;
+  @Output() readonly closed = new EventEmitter<void>();
 
   private watchedIds: string[] = [];
 
@@ -40,6 +53,7 @@ export class ManageRoomComponent implements OnInit, OnDestroy {
   readonly bans = signal<RoomBanView[]>([]);
   readonly roomInvites = signal<InvitationView[]>([]);
   readonly error = signal<string | null>(null);
+
   readonly inviteUsername = this.fb.nonNullable.group({
     username: ['', [Validators.required, Validators.maxLength(40)]],
     message: [''],
@@ -51,26 +65,49 @@ export class ManageRoomComponent implements OnInit, OnDestroy {
     visibility: ['public' as 'public' | 'private'],
   });
 
+  readonly pendingRemove = signal<{ userId: string; username: string } | null>(null);
+  readonly pendingBan = signal<{ userId: string; username: string } | null>(null);
+  readonly banReasonCtrl = new FormControl('', {
+    nonNullable: true,
+    validators: [Validators.maxLength(200)],
+  });
+  readonly confirmingDelete = signal(false);
+
+  readonly isAdminOrOwner = computed(
+    () => this.myRole === 'admin' || this.myRole === 'owner',
+  );
+
   ngOnInit(): void {
-    const id = this.route.snapshot.paramMap.get('id');
-    if (!id) {
-      this.router.navigate(['/rooms']);
-      return;
-    }
-    this.loadRoom(id);
+    this.loadRoom(this.roomId);
   }
 
-  private roomId(): string | null {
-    return this.room()?.id ?? null;
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['roomId'] && !changes['roomId'].firstChange) {
+      this.tab.set('members');
+      this.pendingRemove.set(null);
+      this.pendingBan.set(null);
+      this.confirmingDelete.set(false);
+      this.loadRoom(this.roomId);
+    }
+  }
+
+  ngOnDestroy(): void {
+    if (this.watchedIds.length > 0) {
+      this.presence.unwatch(this.watchedIds);
+      this.watchedIds = [];
+    }
+  }
+
+  close(): void {
+    this.closed.emit();
   }
 
   setTab(t: Tab): void {
+    if ((t === 'banned' || t === 'invitations') && !this.isAdminOrOwner()) return;
     this.tab.set(t);
-    const id = this.roomId();
-    if (!id) return;
-    if (t === 'members' || t === 'admins') this.loadMembers(id);
-    if (t === 'banned') this.loadBans(id);
-    if (t === 'invitations') this.loadInvites(id);
+    if (t === 'members' || t === 'admins') this.loadMembers(this.roomId);
+    if (t === 'banned') this.loadBans(this.roomId);
+    if (t === 'invitations') this.loadInvites(this.roomId);
   }
 
   private loadRoom(id: string): void {
@@ -98,21 +135,6 @@ export class ManageRoomComponent implements OnInit, OnDestroy {
     });
   }
 
-  private rewatchPresence(ids: string[]): void {
-    if (this.watchedIds.length > 0) {
-      this.presence.unwatch(this.watchedIds);
-    }
-    this.presence.watch(ids);
-    this.watchedIds = ids;
-  }
-
-  ngOnDestroy(): void {
-    if (this.watchedIds.length > 0) {
-      this.presence.unwatch(this.watchedIds);
-      this.watchedIds = [];
-    }
-  }
-
   private loadBans(id: string): void {
     this.rooms.listBans(id).subscribe({
       next: (b) => this.bans.set(b),
@@ -121,100 +143,131 @@ export class ManageRoomComponent implements OnInit, OnDestroy {
   }
 
   private loadInvites(id: string): void {
-    // Room-scoped pending list is an admin-only endpoint; silent-ignore if we
-    // are "admin" without being able to list (e.g. server-side mismatch).
-    import('rxjs').then(() => {
-      // no-op; call below uses the HttpClient in the service
-    });
-  }
-
-  promote(userId: string): void {
-    const id = this.roomId();
-    if (!id) return;
-    this.rooms.promote(id, userId).subscribe({
-      next: () => this.loadMembers(id),
+    this.invitations.listForRoom(id).subscribe({
+      next: (list) => this.roomInvites.set(list),
       error: (err: unknown) => this.error.set(this.auth.errorText(err)),
     });
   }
 
-  demote(userId: string): void {
-    const id = this.roomId();
-    if (!id) return;
-    this.rooms.demote(id, userId).subscribe({
-      next: () => this.loadMembers(id),
-      error: (err: unknown) => this.error.set(this.auth.errorText(err)),
-    });
+  private rewatchPresence(ids: string[]): void {
+    if (this.watchedIds.length > 0) {
+      this.presence.unwatch(this.watchedIds);
+    }
+    this.presence.watch(ids);
+    this.watchedIds = ids;
   }
 
   presenceStatus(userId: string): string {
     return this.presence.status(userId);
   }
 
-  remove(userId: string, username: string): void {
-    const id = this.roomId();
-    if (!id) return;
-    if (!confirm(`Remove ${username} from this room? They can rejoin (public rooms) or accept a fresh invite (private rooms).`)) {
-      return;
-    }
-    this.rooms.remove(id, userId).subscribe({
-      next: () => this.loadMembers(id),
+  promote(userId: string): void {
+    this.rooms.promote(this.roomId, userId).subscribe({
+      next: () => this.loadMembers(this.roomId),
       error: (err: unknown) => this.error.set(this.auth.errorText(err)),
     });
   }
 
-  ban(userId: string, username: string): void {
-    const id = this.roomId();
-    if (!id) return;
-    if (!confirm(`Ban ${username}? They cannot rejoin until an admin unbans them.`)) {
-      return;
-    }
-    this.rooms.ban(id, userId, null).subscribe({
+  demote(userId: string): void {
+    this.rooms.demote(this.roomId, userId).subscribe({
+      next: () => this.loadMembers(this.roomId),
+      error: (err: unknown) => this.error.set(this.auth.errorText(err)),
+    });
+  }
+
+  requestRemove(userId: string, username: string): void {
+    this.pendingBan.set(null);
+    this.pendingRemove.set({ userId, username });
+  }
+
+  cancelRemove(): void {
+    this.pendingRemove.set(null);
+  }
+
+  confirmRemove(): void {
+    const pending = this.pendingRemove();
+    if (!pending) return;
+    this.pendingRemove.set(null);
+    this.rooms.remove(this.roomId, pending.userId).subscribe({
+      next: () => this.loadMembers(this.roomId),
+      error: (err: unknown) => this.error.set(this.auth.errorText(err)),
+    });
+  }
+
+  requestBan(userId: string, username: string): void {
+    this.pendingRemove.set(null);
+    this.banReasonCtrl.reset('');
+    this.pendingBan.set({ userId, username });
+  }
+
+  cancelBan(): void {
+    this.pendingBan.set(null);
+  }
+
+  confirmBan(): void {
+    const pending = this.pendingBan();
+    if (!pending || this.banReasonCtrl.invalid) return;
+    const reason = this.banReasonCtrl.value.trim();
+    this.pendingBan.set(null);
+    this.rooms.ban(this.roomId, pending.userId, reason.length > 0 ? reason : null).subscribe({
       next: () => {
-        this.loadMembers(id);
-        this.loadBans(id);
+        this.loadMembers(this.roomId);
+        this.loadBans(this.roomId);
       },
       error: (err: unknown) => this.error.set(this.auth.errorText(err)),
     });
   }
 
   unban(userId: string): void {
-    const id = this.roomId();
-    if (!id) return;
-    this.rooms.unban(id, userId).subscribe({
-      next: () => this.loadBans(id),
+    this.rooms.unban(this.roomId, userId).subscribe({
+      next: () => this.loadBans(this.roomId),
       error: (err: unknown) => this.error.set(this.auth.errorText(err)),
     });
   }
 
   sendInvite(): void {
-    const id = this.roomId();
-    if (!id || this.inviteUsername.invalid) return;
+    if (this.inviteUsername.invalid) return;
     const { username, message } = this.inviteUsername.getRawValue();
-    this.invitations.invite(id, username, message).subscribe({
+    this.invitations.invite(this.roomId, username, message).subscribe({
       next: () => {
         this.inviteUsername.reset({ username: '', message: '' });
         this.error.set(null);
+        this.loadInvites(this.roomId);
       },
       error: (err: unknown) => this.error.set(this.auth.errorText(err)),
     });
   }
 
+  revokeInvite(invitationId: string): void {
+    this.invitations.revoke(invitationId).subscribe({
+      next: () => this.loadInvites(this.roomId),
+      error: (err: unknown) => this.error.set(this.auth.errorText(err)),
+    });
+  }
+
   saveSettings(): void {
-    const id = this.roomId();
-    if (!id || this.settingsForm.invalid) return;
+    if (this.settingsForm.invalid) return;
     const patch: UpdateRoomPayload = this.settingsForm.getRawValue();
-    this.rooms.update(id, patch).subscribe({
+    this.rooms.update(this.roomId, patch).subscribe({
       next: (r) => this.room.set(r),
       error: (err: unknown) => this.error.set(this.auth.errorText(err)),
     });
   }
 
-  deleteRoom(): void {
-    const id = this.roomId();
-    if (!id) return;
-    if (!confirm('Delete this room? All messages and files will be removed.')) return;
-    this.rooms.delete(id).subscribe({
-      next: () => this.router.navigate(['/rooms']),
+  requestDeleteRoom(): void {
+    this.confirmingDelete.set(true);
+  }
+
+  cancelDeleteRoom(): void {
+    this.confirmingDelete.set(false);
+  }
+
+  confirmDeleteRoom(): void {
+    this.rooms.delete(this.roomId).subscribe({
+      next: () => {
+        this.confirmingDelete.set(false);
+        this.closed.emit();
+      },
       error: (err: unknown) => this.error.set(this.auth.errorText(err)),
     });
   }

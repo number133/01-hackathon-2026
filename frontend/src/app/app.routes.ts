@@ -57,11 +57,6 @@ export const routes: Routes = [
     loadComponent: () => import('./rooms/room-view.component').then((m) => m.RoomViewComponent),
   },
   {
-    path: 'rooms/:id/manage',
-    canActivate: [authGuard],
-    loadComponent: () => import('./rooms/manage-room.component').then((m) => m.ManageRoomComponent),
-  },
-  {
     path: 'invitations',
     canActivate: [authGuard],
     loadComponent: () => import('./rooms/invitations.component').then((m) => m.InvitationsComponent),

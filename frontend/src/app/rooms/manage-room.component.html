@@ -1,92 +1,142 @@
-<section class="wide-card" *ngIf="room() as r">
-  <h1>Manage: {{ r.name }}</h1>
-  <div *ngIf="error() as msg" class="error">{{ msg }}</div>
+<div class="modal-overlay" (click)="close()">
+  <section class="wide-card modal-panel" *ngIf="room() as r" (click)="$event.stopPropagation()">
+    <div class="row between">
+      <h1>Manage: {{ r.name }}</h1>
+      <button type="button" class="link" aria-label="Close" (click)="close()">×</button>
+    </div>
+    <div *ngIf="error() as msg" class="error">{{ msg }}</div>
 
-  <nav class="tabs">
-    <button type="button" [class.active]="tab() === 'members'" (click)="setTab('members')">Members</button>
-    <button type="button" [class.active]="tab() === 'admins'" (click)="setTab('admins')">Admins</button>
-    <button type="button" [class.active]="tab() === 'banned'" (click)="setTab('banned')">Banned</button>
-    <button type="button" [class.active]="tab() === 'invitations'" (click)="setTab('invitations')">Invitations</button>
-    <button type="button" [class.active]="tab() === 'settings'" (click)="setTab('settings')">Settings</button>
-  </nav>
+    <nav class="tabs">
+      <button type="button" [class.active]="tab() === 'members'" (click)="setTab('members')">Members</button>
+      <button type="button" [class.active]="tab() === 'admins'" (click)="setTab('admins')">Admins</button>
+      <ng-container *ngIf="isAdminOrOwner()">
+        <button type="button" [class.active]="tab() === 'banned'" (click)="setTab('banned')">Banned</button>
+        <button type="button" [class.active]="tab() === 'invitations'" (click)="setTab('invitations')">Invitations</button>
+      </ng-container>
+      <button type="button" [class.active]="tab() === 'settings'" (click)="setTab('settings')">Settings</button>
+    </nav>
 
-  <section *ngIf="tab() === 'members'">
-    <table>
-      <thead>
-        <tr><th>Username</th><th>Status</th><th>Role</th><th>Actions</th></tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let m of members()">
-          <td><app-presence-dot [userId]="m.userId"></app-presence-dot>{{ m.username }}</td>
-          <td class="muted">{{ presenceStatus(m.userId) }}</td>
-          <td>{{ m.role }}</td>
-          <td>
-            <button *ngIf="m.role === 'member' && r.myRole === 'owner'" type="button" class="small" (click)="promote(m.userId)">Promote</button>
-            <button *ngIf="m.role === 'admin' && (r.myRole === 'owner' || r.myRole === 'admin')" type="button" class="small" (click)="demote(m.userId)">Demote</button>
-            <button *ngIf="m.role !== 'owner'" type="button" class="small" (click)="remove(m.userId, m.username)">Remove</button>
-            <button *ngIf="m.role !== 'owner'" type="button" class="small danger" (click)="ban(m.userId, m.username)">Ban</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </section>
+    <section *ngIf="tab() === 'members'">
+      <table>
+        <thead>
+          <tr><th>Username</th><th>Status</th><th>Role</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+          <ng-container *ngFor="let m of members()">
+            <tr>
+              <td><app-presence-dot [userId]="m.userId"></app-presence-dot>{{ m.username }}</td>
+              <td class="muted">{{ presenceStatus(m.userId) }}</td>
+              <td>{{ m.role }}</td>
+              <td>
+                <button *ngIf="m.role === 'member' && r.myRole === 'owner'" type="button" class="small" (click)="promote(m.userId)">Promote</button>
+                <button *ngIf="m.role === 'admin' && (r.myRole === 'owner' || r.myRole === 'admin')" type="button" class="small" (click)="demote(m.userId)">Demote</button>
+                <button *ngIf="m.role !== 'owner' && isAdminOrOwner()" type="button" class="small" (click)="requestRemove(m.userId, m.username)">Remove</button>
+                <button *ngIf="m.role !== 'owner' && isAdminOrOwner()" type="button" class="small danger" (click)="requestBan(m.userId, m.username)">Ban</button>
+              </td>
+            </tr>
+            <tr *ngIf="pendingRemove() as pr" [class.confirm-row]="true">
+              <td colspan="4" *ngIf="pr.userId === m.userId">
+                Remove <strong>{{ pr.username }}</strong>? They can rejoin a public room or accept a fresh invite for a private one.
+                <button type="button" class="small danger" (click)="confirmRemove()">Confirm remove</button>
+                <button type="button" class="small" (click)="cancelRemove()">Cancel</button>
+              </td>
+            </tr>
+            <tr *ngIf="pendingBan() as pb" [class.confirm-row]="true">
+              <td colspan="4" *ngIf="pb.userId === m.userId">
+                Ban <strong>{{ pb.username }}</strong>? Reason (optional):
+                <input type="text" maxlength="200" [formControl]="banReasonCtrl" placeholder="e.g. spam" />
+                <button type="button" class="small danger" (click)="confirmBan()">Confirm ban</button>
+                <button type="button" class="small" (click)="cancelBan()">Cancel</button>
+              </td>
+            </tr>
+          </ng-container>
+        </tbody>
+      </table>
+    </section>
 
-  <section *ngIf="tab() === 'admins'">
-    <p class="muted">Only the owner can promote. Any admin can demote other admins (but not the owner).</p>
-    <ul>
-      <li *ngFor="let m of members()" [class.muted]="m.role === 'member'">
-        <ng-container *ngIf="m.role !== 'member'">
-          {{ m.username }} — {{ m.role }}
-          <button *ngIf="m.role === 'admin'" type="button" class="small" (click)="demote(m.userId)">Demote</button>
-        </ng-container>
-      </li>
-    </ul>
-  </section>
+    <section *ngIf="tab() === 'admins'">
+      <p class="muted">Only the owner can promote. Any admin can demote other admins (but not the owner).</p>
+      <ul>
+        <li *ngFor="let m of members()" [class.muted]="m.role === 'member'">
+          <ng-container *ngIf="m.role !== 'member'">
+            {{ m.username }} — {{ m.role }}
+            <button *ngIf="m.role === 'admin' && isAdminOrOwner()" type="button" class="small" (click)="demote(m.userId)">Demote</button>
+          </ng-container>
+        </li>
+      </ul>
+    </section>
 
-  <section *ngIf="tab() === 'banned'">
-    <p class="muted" *ngIf="bans().length === 0">No banned users.</p>
-    <table *ngIf="bans().length > 0">
-      <thead>
-        <tr><th>Username</th><th>Banned by</th><th>Reason</th><th>When</th><th>Actions</th></tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let b of bans()">
-          <td>{{ b.username }}</td>
-          <td>{{ b.bannedByUsername ?? '(deleted)' }}</td>
-          <td>{{ b.reason ?? '—' }}</td>
-          <td>{{ b.bannedAt | date: 'medium' }}</td>
-          <td><button type="button" class="small" (click)="unban(b.userId)">Unban</button></td>
-        </tr>
-      </tbody>
-    </table>
-  </section>
+    <section *ngIf="tab() === 'banned' && isAdminOrOwner()">
+      <p class="muted" *ngIf="bans().length === 0">No banned users.</p>
+      <table *ngIf="bans().length > 0">
+        <thead>
+          <tr><th>Username</th><th>Banned by</th><th>Reason</th><th>When</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let b of bans()">
+            <td>{{ b.username }}</td>
+            <td>{{ b.bannedByUsername ?? '(deleted)' }}</td>
+            <td>{{ b.reason ?? '—' }}</td>
+            <td>{{ b.bannedAt | date: 'medium' }}</td>
+            <td><button type="button" class="small" (click)="unban(b.userId)">Unban</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
 
-  <section *ngIf="tab() === 'invitations'">
-    <form [formGroup]="inviteUsername" (ngSubmit)="sendInvite()" class="row gap">
-      <input type="text" formControlName="username" placeholder="Username to invite" />
-      <input type="text" formControlName="message" placeholder="Optional message" />
-      <button type="submit" [disabled]="inviteUsername.invalid">Send invite</button>
-    </form>
-  </section>
+    <section *ngIf="tab() === 'invitations' && isAdminOrOwner()">
+      <form [formGroup]="inviteUsername" (ngSubmit)="sendInvite()" class="row gap">
+        <input type="text" formControlName="username" placeholder="Username to invite" />
+        <input type="text" formControlName="message" placeholder="Optional message" />
+        <button type="submit" [disabled]="inviteUsername.invalid">Send invite</button>
+      </form>
 
-  <section *ngIf="tab() === 'settings'">
-    <form [formGroup]="settingsForm" (ngSubmit)="saveSettings()">
-      <label><span>Name</span><input type="text" formControlName="name" /></label>
-      <label><span>Description</span><textarea formControlName="description" rows="3"></textarea></label>
-      <label><span>Visibility</span>
-        <div class="row gap">
-          <label class="inline">
-            <input type="radio" formControlName="visibility" value="public" /> <span>Public</span>
-          </label>
-          <label class="inline">
-            <input type="radio" formControlName="visibility" value="private" /> <span>Private</span>
-          </label>
+      <h3>Pending invitations</h3>
+      <p class="muted" *ngIf="roomInvites().length === 0">No pending invitations.</p>
+      <table *ngIf="roomInvites().length > 0">
+        <thead>
+          <tr><th>Invitee</th><th>Invited by</th><th>Message</th><th>When</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let inv of roomInvites()">
+            <td>{{ inv.inviteeUsername }}</td>
+            <td>{{ inv.inviterUsername ?? '(deleted)' }}</td>
+            <td>{{ inv.message ?? '—' }}</td>
+            <td>{{ inv.createdAt | date: 'medium' }}</td>
+            <td><button type="button" class="small danger" (click)="revokeInvite(inv.id)">Revoke</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section *ngIf="tab() === 'settings'">
+      <form [formGroup]="settingsForm" (ngSubmit)="saveSettings()">
+        <label><span>Name</span><input type="text" formControlName="name" /></label>
+        <label><span>Description</span><textarea formControlName="description" rows="3"></textarea></label>
+        <label><span>Visibility</span>
+          <div class="row gap">
+            <label class="inline">
+              <input type="radio" formControlName="visibility" value="public" /> <span>Public</span>
+            </label>
+            <label class="inline">
+              <input type="radio" formControlName="visibility" value="private" /> <span>Private</span>
+            </label>
+          </div>
+        </label>
+        <div class="row between">
+          <button type="submit">Save changes</button>
+          <button *ngIf="r.myRole === 'owner' && !confirmingDelete()"
+                  type="button" class="danger" (click)="requestDeleteRoom()">Delete room</button>
         </div>
-      </label>
-      <div class="row between">
-        <button type="submit">Save changes</button>
-        <button type="button" class="danger" (click)="deleteRoom()">Delete room</button>
+      </form>
+
+      <div *ngIf="confirmingDelete()" class="confirm-row" style="margin-top: 12px; padding: 12px; background: #1e2d40; border-radius: 8px;">
+        Delete this room permanently? All messages and files will be removed and cannot be recovered.
+        <div class="row gap" style="margin-top: 8px;">
+          <button type="button" class="danger" (click)="confirmDeleteRoom()">Yes, delete it</button>
+          <button type="button" (click)="cancelDeleteRoom()">Cancel</button>
+        </div>
       </div>
-    </form>
+    </section>
   </section>
-</section>
+</div>

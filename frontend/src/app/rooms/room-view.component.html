@@ -11,10 +11,9 @@
         <p class="muted">Owner: {{ r.ownerUsername }} · {{ r.memberCount }} member{{ r.memberCount === 1 ? '' : 's' }}</p>
       </div>
       <div>
-        <a *ngIf="r.myRole === 'owner' || r.myRole === 'admin'"
-           [routerLink]="['/rooms', r.id, 'manage']">
-          <button type="button">Manage room</button>
-        </a>
+        <button *ngIf="r.myRole === 'owner' || r.myRole === 'admin'"
+                type="button"
+                (click)="manageOpen.set(true)">Manage room</button>
         <button *ngIf="!r.myRole && r.visibility === 'public'" type="button" (click)="join()">Join</button>
         <button *ngIf="r.myRole && r.myRole !== 'owner'" type="button" (click)="leave()">Leave</button>
       </div>
@@ -58,3 +57,10 @@
 <ng-template #loadingTpl>
   <p class="booting">Loading room…</p>
 </ng-template>
+
+<app-manage-room
+  *ngIf="manageOpen() && room()?.myRole"
+  [roomId]="room()!.id"
+  [myRole]="room()!.myRole ?? null"
+  (closed)="manageOpen.set(false)">
+</app-manage-room>

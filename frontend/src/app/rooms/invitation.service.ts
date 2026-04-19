@@ -30,6 +30,10 @@ export class InvitationService {
       .pipe(tap((list) => this.pendingCount.set(list.length)));
   }
 
+  listForRoom(roomId: string): Observable<InvitationView[]> {
+    return this.http.get<InvitationView[]>(`/api/rooms/${roomId}/invitations`);
+  }
+
   invite(roomId: string, username: string, message?: string): Observable<InvitationView> {
     return this.http.post<InvitationView>(`/api/rooms/${roomId}/invitations`, {
       username,
