@@ -1209,6 +1209,9 @@ app-dialog-context-pane > .chat-context {
   backdrop-filter: blur(var(--g-blur-lg)) saturate(160%);
   -webkit-backdrop-filter: blur(var(--g-blur-lg)) saturate(160%);
   box-shadow: var(--g-shadow-md);
+  /* Own compositing layer so the backdrop-filter layer doesn't bleed
+   * into descendant hit-testing on Chromium. */
+  isolation: isolate;
 }
 
 .chat-main .chat-header {
@@ -1360,6 +1363,7 @@ app-message-list {
   flex: 1 1 0;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 20px 14px 22px;
   background: transparent;
   display: flex;
@@ -1367,6 +1371,11 @@ app-message-list {
   gap: 4px;
   border: 0;
   border-radius: 0;
+  /* Promote to its own compositing layer so the parent's
+   * backdrop-filter + border-radius + overflow-hidden combo
+   * doesn't intermittently eat wheel hit-testing. */
+  transform: translateZ(0);
+  will-change: scroll-position;
 }
 
 .message-scroller::-webkit-scrollbar { width: 6px; }
@@ -1492,7 +1501,7 @@ app-message-item .actions {
   top: -18px;
   display: flex;
   gap: 2px;
-  background: var(--g-glass-900);
+  background: #fff;
   border: var(--g-border-edge);
   border-radius: var(--g-radius-pill);
   padding: 3px 4px;
@@ -1500,8 +1509,6 @@ app-message-item .actions {
   transition: opacity 120ms ease;
   pointer-events: none;
   box-shadow: var(--g-shadow-md);
-  backdrop-filter: blur(var(--g-blur-md));
-  -webkit-backdrop-filter: blur(var(--g-blur-md));
 }
 app-message-item.theirs .actions { left: 8px; }
 app-message-item.mine .actions { right: 8px; }
