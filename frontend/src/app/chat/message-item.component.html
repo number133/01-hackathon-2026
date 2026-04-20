@@ -25,9 +25,9 @@
         </div>
 
         <div class="actions">
-          <button type="button" class="icon-btn" title="Reply" (click)="emitReply()">↩</button>
-          <button *ngIf="canEdit" type="button" class="icon-btn" title="Edit" (click)="startEdit()">✎</button>
-          <button *ngIf="canDelete" type="button" class="icon-btn danger" title="Delete" (click)="deleteMessage()">🗑</button>
+          <button type="button" class="icon-btn" title="Reply" aria-label="Reply" (click)="emitReply()">↩</button>
+          <button *ngIf="canEdit" type="button" class="icon-btn" title="Edit" aria-label="Edit" (click)="startEdit()">✎</button>
+          <button *ngIf="canDelete" type="button" class="icon-btn danger" title="Delete" aria-label="Delete" (click)="deleteMessage()">🗑</button>
         </div>
       </ng-container>
 

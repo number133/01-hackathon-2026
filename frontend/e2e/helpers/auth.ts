@@ -234,13 +234,24 @@ export async function sendRoomMessage(
   text: string,
   opts: { replyToId?: string; attachmentIds?: string[] } = {},
 ): Promise<{ id: string; seq: number }> {
-  const res = await apiPost(request, `/api/rooms/${roomId}/messages`, {
+  const body = {
     text,
     replyToId: opts.replyToId ?? null,
     attachmentIds: opts.attachmentIds ?? [],
-  });
-  expect(res.ok(), `send message: ${res.status()} ${await res.text()}`).toBeTruthy();
-  return (await res.json()) as { id: string; seq: number };
+  };
+  // Room message rate limit is 20 burst + 1/sec refill. Tests that seed
+  // many messages would otherwise fail once the bucket drains; back off
+  // on 429 and retry.
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const res = await apiPost(request, `/api/rooms/${roomId}/messages`, body);
+    if (res.status() === 429) {
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+      continue;
+    }
+    expect(res.ok(), `send message: ${res.status()} ${await res.text()}`).toBeTruthy();
+    return (await res.json()) as { id: string; seq: number };
+  }
+  throw new Error('send message: exhausted retries against rate limiter');
 }
 
 export async function uploadAttachment(

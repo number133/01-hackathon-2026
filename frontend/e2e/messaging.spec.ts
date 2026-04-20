@@ -44,7 +44,7 @@ test.describe('messaging (§2.5)', () => {
 
     await page.reload();
     await expect(
-      page.locator('article.message').filter({ hasText: body }),
+      page.locator('article.bubble').filter({ hasText: body }),
     ).toBeVisible({ timeout: 10_000 });
 
     await ctx.close();
@@ -73,7 +73,7 @@ test.describe('messaging (§2.5)', () => {
     await expect(composer).toHaveValue('', { timeout: 10_000 });
 
     await page.reload();
-    const msg = page.locator('article.message p.body').filter({ hasText: /line1[\s\S]+line2/ });
+    const msg = page.locator('article.bubble p.body').filter({ hasText: /line1[\s\S]+line2/ });
     await expect(msg).toBeVisible({ timeout: 10_000 });
 
     await ctx.close();
@@ -165,7 +165,8 @@ test.describe('messaging (§2.5)', () => {
     await page.goto(`/rooms/${room.id}`);
     await waitForChatReady(page);
 
-    const origBubble = page.locator('article.message').filter({ hasText: 'original message' });
+    const origBubble = page.locator('article.bubble').filter({ hasText: 'original message' });
+    await origBubble.hover();
     await origBubble.getByRole('button', { name: /^Reply$/ }).click();
 
     const chip = page.locator('section.composer .reply-chip');
@@ -174,14 +175,15 @@ test.describe('messaging (§2.5)', () => {
     await chip.locator('button', { hasText: '×' }).click();
     await expect(chip).toHaveCount(0);
 
+    await origBubble.hover();
     await origBubble.getByRole('button', { name: /^Reply$/ }).click();
     await page.locator('section.composer textarea').fill('replying now');
     await page.locator('section.composer').getByRole('button', { name: /^Send$/ }).click();
     await expect(page.locator('section.composer textarea')).toHaveValue('', { timeout: 10_000 });
 
     await page.reload();
-    const replyBubble = page.locator('article.message').filter({ hasText: 'replying now' });
-    await expect(replyBubble.locator('.reply-chip')).toContainText('original message');
+    const replyBubble = page.locator('article.bubble').filter({ hasText: 'replying now' });
+    await expect(replyBubble.locator('.quote')).toContainText('original message');
 
     await ctx.close();
   });
@@ -201,12 +203,14 @@ test.describe('messaging (§2.5)', () => {
     await page.goto(`/rooms/${room.id}`);
     await waitForChatReady(page);
 
-    await page.locator('article.message').filter({ hasText: 'before edit' }).getByRole('button', { name: /^Edit$/ }).click();
+    const beforeEdit = page.locator('article.bubble').filter({ hasText: 'before edit' });
+    await beforeEdit.hover();
+    await beforeEdit.getByRole('button', { name: /^Edit$/ }).click();
 
     // Once edit mode engages, the bubble no longer contains the body paragraph
     // with "before edit" — hasText won't match it. Target the editing article
     // by looking for the one that now contains a textarea + Save button.
-    const editingBubble = page.locator('article.message').filter({
+    const editingBubble = page.locator('article.bubble').filter({
       has: page.locator('button', { hasText: 'Save' }),
     });
     await expect(editingBubble).toBeVisible({ timeout: 5_000 });
@@ -215,8 +219,8 @@ test.describe('messaging (§2.5)', () => {
 
     await page.reload();
     await expect(
-      page.locator('article.message').filter({ hasText: 'after edit' }),
-    ).toContainText('(edited)', { timeout: 15_000 });
+      page.locator('article.bubble').filter({ hasText: 'after edit' }).locator('.edited'),
+    ).toBeVisible({ timeout: 15_000 });
 
     await ctx.close();
   });
@@ -245,7 +249,7 @@ test.describe('messaging (§2.5)', () => {
     await page.goto(`/rooms/${room.id}`);
     await waitForChatReady(page);
 
-    const bubble = page.locator('article.message').filter({ hasText: 'owner message' });
+    const bubble = page.locator('article.bubble').filter({ hasText: 'owner message' });
     await expect(bubble).toBeVisible();
     await expect(bubble.getByRole('button', { name: /^Edit$/ })).toHaveCount(0);
     await expect(bubble.getByRole('button', { name: /^Delete$/ })).toHaveCount(0);
@@ -268,12 +272,13 @@ test.describe('messaging (§2.5)', () => {
     await page.goto(`/rooms/${room.id}`);
     await waitForChatReady(page);
 
-    const bubble = page.locator('article.message').filter({ hasText: 'delete me' });
+    const bubble = page.locator('article.bubble').filter({ hasText: 'delete me' });
+    await bubble.hover();
     await bubble.getByRole('button', { name: /^Delete$/ }).click();
 
     await page.reload();
     await expect(
-      page.locator('article.message.deleted').filter({ hasText: /\(deleted\)/ }),
+      page.locator('article.bubble.deleted').filter({ hasText: /\(deleted\)/ }),
     ).toBeVisible({ timeout: 10_000 });
 
     await ctx.close();
@@ -308,7 +313,7 @@ test.describe('messaging (§2.5)', () => {
     await page.goto(`/dialogs/${dialog.id}`);
     await waitForChatReady(page);
 
-    const bobBubble = page.locator('article.message').filter({ hasText: 'from bob' });
+    const bobBubble = page.locator('article.bubble').filter({ hasText: 'from bob' });
     await expect(bobBubble).toBeVisible({ timeout: 10_000 });
     await expect(bobBubble.getByRole('button', { name: /^Edit$/ })).toHaveCount(0);
     await expect(bobBubble.getByRole('button', { name: /^Delete$/ })).toHaveCount(0);
@@ -333,7 +338,7 @@ test.describe('messaging (§2.5)', () => {
     await page.goto(`/rooms/${room.id}`);
     await waitForChatReady(page);
 
-    const bodies = await page.locator('article.message p.body').allInnerTexts();
+    const bodies = await page.locator('article.bubble p.body').allInnerTexts();
     const m1 = bodies.findIndex((b) => b.includes('m1-aaaaaa'));
     const m2 = bodies.findIndex((b) => b.includes('m2-bbbbbb'));
     const m3 = bodies.findIndex((b) => b.includes('m3-cccccc'));
@@ -362,12 +367,12 @@ test.describe('messaging (§2.5)', () => {
     await page.goto(`/rooms/${room.id}`);
     await waitForChatReady(page);
 
-    const countBefore = await page.locator('article.message').count();
+    const countBefore = await page.locator('article.bubble').count();
     expect(countBefore).toBeGreaterThan(0);
 
     await page.locator('.message-scroller').evaluate((el) => (el.scrollTop = 0));
     await expect
-      .poll(async () => page.locator('article.message').count(), { timeout: 15_000 })
+      .poll(async () => page.locator('article.bubble').count(), { timeout: 15_000 })
       .toBeGreaterThan(countBefore);
 
     await ctx.close();
@@ -408,7 +413,7 @@ test.describe('messaging (§2.5)', () => {
     await page.goto(`/rooms/${room.id}`);
     await waitForChatReady(page);
     await expect(
-      page.locator('article.message').filter({ hasText: offlineMsg }),
+      page.locator('article.bubble').filter({ hasText: offlineMsg }),
     ).toBeVisible({ timeout: 10_000 });
 
     await ctx.close();

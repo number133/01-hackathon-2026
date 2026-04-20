@@ -27,12 +27,12 @@ test.describe('non-functional (§3)', () => {
     await loginViaUi(pageA, u);
     await pageA.goto(`/rooms/${room.id}`);
     await expect(
-      pageA.locator('article.message').filter({ hasText: body }),
+      pageA.locator('article.bubble').filter({ hasText: body }),
     ).toBeVisible({ timeout: 10_000 });
 
     await pageB.goto(`/rooms/${room.id}`);
     await expect(
-      pageB.locator('article.message').filter({ hasText: body }),
+      pageB.locator('article.bubble').filter({ hasText: body }),
     ).toBeVisible({ timeout: 10_000 });
 
     await ctx.close();
